@@ -1,124 +1,206 @@
-# 滑雪小狗
 
-以治愈系的「线条小狗」为主题 IP，这是一款专为异地情侣量身定制的**互动陪伴与共同成长**应用。
+# 滑雪小狗（Puppy Journey）
 
-本项目巧妙融合了情侣空间、旅行日志、心愿墙与成就系统，用于记录双向奔赴的点滴回忆。更创新性地引入了「未来排练室」模块——通过多智能体技术，将情侣间的日常打卡与回忆沉淀，自动转化为个性化的 AI 小语种互动学习剧本。从而打造出一个从“日常陪伴鼓励”到“为未来相逢共同学习”的情感与成长闭环。
+> AI-native 的异地情侣互动与共同成长应用。  
+> 通过多智能体编排将“日常陪伴数据”转化为“可互动学习内容”，形成从情感记录到能力共建的完整闭环。
 
-## 项目定位
-- **核心目标**：打破物理距离的限制，通过游戏化互动与 AI 赋能的陪伴式学习，提升异地情侣的参与感与共同成长体验。探索大模型在亲密关系场景下的落地，提升异地情侣的陪伴感与共同探索新技能的乐趣。
-- **产品形态**：
-  - `puppy-journey`：Next.js 全栈 Web 应用（前端 + API）
-  - `rehearsal_backend`：Python / LangGraph 编排原型（独立实验后端）
-
-## 功能概览
-### 1) 情侣空间（Onboarding + 身份绑定）
-- 匿名会话进入（Supabase Anonymous Auth）
-- 选择角色：`yellow_dog` / `white_dog`
-- 创建房间邀请码或加入房间
-- 情侣双方配对完成后进入主流程
-对应页面与接口：
-- 页面：`src/app/onboarding/page.tsx`
-- API：`/api/couple/create-room`、`/api/couple/join`、`/api/couple/leave`、`/api/couple/me`、`/api/couple/set-role`
-### 2) 主页（双狗靠近进度）
-- 展示“下一次见面 / 结束分离状态”双进度目标
-- 与成就积分联动，支持动画反馈（彩带、贴贴）
-对应页面：
-- `src/app/(main)/page.tsx`
-### 3) 旅行日志
-- 结构化记录：标题、日期、地点、随笔、多图
-- 支持图片上传/存储（Supabase Storage）
-- 时间线展示，数据可作为后续 AI 上下文
-对应页面与接口：
-- 页面：`src/app/travel/page.tsx`
-- API：`/api/travel-logs`、`/api/travel-logs/[id]`、`/api/travel-logs/upload-photo`
-### 4) 心愿墙
-- 新建/查看/完成/删除心愿
-- 地图与时间线联动，展示“去过的城市”与“许愿瓶”
-对应页面与接口：
-- 页面：`src/app/wishes/page.tsx`、`src/app/wishes/new/page.tsx`
-- API：`/api/wishes`、`/api/wishes/[id]`
-### 5) 成就系统
-- 双列任务板（自己 / 对方）
-- 状态岛、专注模式、盲盒挂载与拆盒流程
-- presence（在线状态/悄悄话）同步
-对应页面与接口：
-- 页面：`src/app/achievements/page.tsx`
-- API：`/api/achievements/bootstrap`、`/api/achievements/tasks`、`/api/achievements/presence`、`/api/achievements/bond-summary`、`/api/achievements/whisper/read`
-### 6) 未来排练室
-- 剧场化学习视图（脚本、关键帧、视频、词汇流）
-- 后端管线：脚本生成 → 图像生成 → 视频任务 → 状态轮询
-- SOS 句子辅助（发音/跟读提示）
-对应页面与接口：
-- 页面：`src/app/learning/page.tsx`
-- 组件：`src/components/learning/RehearsalTheaterView.tsx`
-- API：`/api/pipeline/script`、`/api/pipeline/image`、`/api/pipeline/video/start`、`/api/pipeline/jobs/[id]`、`/api/rehearsal`、`/api/rehearsal/sos`
 ---
-## 技术架构
-## 总体架构
-- **前端**：Next.js App Router + React 19 + TypeScript + Tailwind CSS
-- **状态管理**：Zustand（含持久化）
-- **后端能力**：Next.js Route Handlers（Node.js runtime）
-- **数据库/鉴权/存储**：Supabase（Postgres + Auth + Storage）
-- **AI 能力**：
-  - OpenAI 兼容调用（脚本类）
-  - 火山方舟（Q版图像、图生视频）
-  - 可切换 mock / http provider
-## 代码分层（`puppy-journey`）
-- `src/app/*`：页面路由（UI 入口）
-- `src/app/api/*`：BFF API 路由（鉴权、参数校验、业务编排）
-- `src/components/*`：业务组件与 UI 组件
-- `src/lib/*`：基础库（Supabase、pipeline、auth、db 映射、工具函数）
-- `src/store/useAppStore.ts`：全局客户端状态
-- `supabase/migrations/*`：数据库结构和策略演进
-## 数据边界与安全
-- 以情侣空间（`couple_id`）做主要数据隔离边界
-- API 层通过 `requireCoupleWorkspaceContext` / `requireBearerUser` 进行上下文校验
-- 服务端私钥仅使用 `SUPABASE_SERVICE_ROLE_KEY`
-- 浏览器仅使用 `NEXT_PUBLIC_*` 变量（公开级别）
+
+## 1. 项目概述
+
+一个以情侣双人关系为核心的数据与交互系统，面向“长期异地、共同成长”的使用场景。  
+系统不仅提供基础的记录功能（旅行、心愿、成就），更具备多模态生成能力（定制剧本、图像、视频、词汇卡），并通过可编排的 AI Pipeline 贯通数据流与业务流。
+
+### 核心价值
+- **关系维度**：提升异地关系中的陪伴连续性与互动参与感。
+- **能力维度**：将记忆资产转化为个性化学习资产（未来排练室）。
+- **工程维度**：采用模块化、多模型选型可切换的 AI 基建，支持系统快速迭代与鲁棒运行。
+
 ---
-## Monorepo 目录结构
-```text
-.
-├─ puppy-journey/               # 主应用（Next.js）
-│  ├─ src/
-│  ├─ public/
-│  ├─ supabase/migrations/
-│  └─ package.json
-├─ rehearsal_backend/           # LangGraph 原型后端（Python）
-│  ├─ rehearsal_graph.py
-│  ├─ ai_wrapper.py
-│  └─ .env.local (本地私密，不入库)
-└─ docs/assets/...              # 需求文档、素材等
-本地开发
-1. 安装依赖
+
+## 2. 核心技术亮点
+
+### 2.1 LangGraph 多智能体编排（未来排练室）
+
+项目在 `rehearsal_backend` 模块中实现了基于 LangGraph 的有向无环图（DAG）编排原型，其典型流水线流程为：
+
+`START -> perception -> fusion -> script -> media -> END`
+
+#### 智能体 (Agent) 节点拆分策略
+- **Perception 感知层（并发执行）**
+  - **文本解析 Agent**：识别用户学习目标与语义意图。
+  - **语音线索 Agent**：抽取情绪特征与表达节奏信息。
+  - **图像场景 Agent**：解析视觉上下文与场景元素。
+- **Fusion 融合层**
+  - **多模态融合 Agent**：聚合多维特征，生成统一语料与教学导向。
+- **Script 生成层**
+  - **剧本生成 Agent**：输出包含角色设定与时间戳的结构化 JSON 数据。
+- **Media 媒体层（并发执行）**
+  - **视频任务 Agent**：发起并调度下游视频生成任务。
+  - **词汇卡 Agent**：从剧本中自动提取并构建可学习词条。
+- **SOS 旁路系统**
+  - 单句发音与跟读辅助，作为独立于主 DAG 的实时低延迟旁路能力。
+
+---
+
+### 2.2 AI-native 数据闭环
+
+系统实现了业务数据向 AI 上下文的原生注入，而非传统的离散 Prompt 拼接：
+
+- **上游数据源**：旅行日志、心愿墙、成就系统等非结构化与结构化记录。
+- **中游编排层**：脚本生成、关键帧图像生成、视频渲染任务调度。
+- **下游交互层**：剧场视图、角色台词流、互动词汇卡、SOS 跟读辅助。
+
+该闭环机制使得 AI 生成内容具备极强的个体化特征与关系语境一致性，有效抑制模型幻觉。
+
+---
+
+### 2.3 旅行日志的 AI 图像扩展（Q版生成）
+
+旅行模块支持结构化数据记录与图像多媒体上传，并在此基础上扩展了 Q 版图像生成能力：
+
+- **多模态融合输入**：支持多图参考输入（用户真实图 + 风格参考图）。
+- **一致性约束**：通过固定风格约束 prompt，保持线条小狗 IP 角色的造型一致性。
+- **资产沉淀**：输出内容直接落库，用于前端回忆时间线展示及后续多媒体学习素材的生成。
+
+从系统架构视角，旅行模块不仅是关系数据的存储层，更是整个 AI 生成链路的高质量语义数据源。
+
+---
+
+## 3. 技术栈
+
+- **Web 框架**：Next.js（App Router）+ React + TypeScript
+- **样式系统**：Tailwind CSS
+- **状态管理**：Zustand（含状态持久化）
+- **后端接口层**：Next.js Route Handlers（BFF，Backend for Frontend）
+- **数据与鉴权基础设施**：Supabase（PostgreSQL + Auth + Storage）
+- **AI 能力层**：
+  - OpenAI-compatible 协议（脚本及文本类生成）
+  - 火山引擎（Q 版图像生成、视频流能力接入）
+  - Provider 抽象层（支持 mock / http 快速切换）
+
+---
+
+## 4. 安全与数据边界
+
+- 以 `couple_id` 作为核心数据隔离边界，保障多租户场景下的数据安全。
+- API 接口层执行严格的工作区上下文校验（例如：情侣绑定关系上下文、Bearer Token 用户身份校验）。
+- 服务端高权限或敏感操作统一通过 `SUPABASE_SERVICE_ROLE_KEY` 闭环执行，防止越权。
+- 前端环境严格限制变量暴露，仅允许 `NEXT_PUBLIC_*` 级别的环境变量透出。
+
+---
+
+## 5. 关键业务模块
+
+### 情侣空间（Onboarding）
+- 匿名进入、角色绑定设置。
+- 支持邀请码机制建房与加入。
+- 双方配对握手成功后，解锁并进入主业务流程。
+
+### 主页（关系状态可视化）
+- 双核心目标进度追踪（下一次见面倒计时 / 异地分离期结束倒计时）。
+- 引入与成就积分系统联动的动态正反馈机制。
+
+### 旅行日志（Travel）
+- 提供标题、日期、地点、随笔、多图关联的结构化记录表单。
+- 采用时间线 (Timeline) 视图展示，深度集成对象存储服务。
+- 触发 AI Q 版图像生成扩展流程。
+
+### 心愿墙（Wishes）
+- 支持心愿的 CRUD（新建 / 完成 / 删除）操作。
+- 数据状态与地理位置地图、旅行时间线模块深度联动。
+
+### 成就系统（Achievements）
+- 双列任务板设计（自我任务 / 伴侣任务）。
+- 支持高频状态同步、专注模式计时，以及双向互动反馈。
+
+### 未来排练室（Learning）
+- 剧本、关键帧、视频流、交互词汇卡的协同 UI 展示。
+- 串联 脚本生成 -> 图像渲染 -> 视频任务下发 -> 异步轮询的完整 Pipeline。
+- 集成 SOS 跟读与语音辅助功能。
+
+---
+
+## 6. 关键 API（节选）
+
+系统接口采用 RESTful 风格与微服务思想设计：
+
+**Couple (关系与鉴权)**
+- `POST /api/couple/create-room`
+- `POST /api/couple/join`
+- `POST /api/couple/leave`
+- `GET  /api/couple/me`
+- `POST /api/couple/set-role`
+
+**Travel / Wishes (业务数据流)**
+- `GET/POST /api/travel-logs`
+- `GET/PUT  /api/travel-logs/[id]`
+- `POST     /api/travel-logs/upload-photo`
+- `GET/POST /api/wishes`
+- `GET/PUT  /api/wishes/[id]`
+
+**Achievements (状态同步)**
+- `POST /api/achievements/bootstrap`
+- `GET  /api/achievements/tasks`
+- `POST /api/achievements/presence`
+- `GET  /api/achievements/bond-summary`
+- `GET  /api/achievements/whisper/read`
+
+**AI Pipeline (多智能体与任务调度)**
+- `POST /api/pipeline/script`
+- `POST /api/pipeline/image`
+- `POST /api/pipeline/video/start`
+- `GET  /api/pipeline/jobs/[id]`
+- `GET  /api/rehearsal`
+- `POST /api/rehearsal/sos`
+- `POST /api/generate-q-avatar`
+
+---
+
+## 7. 快速开始
+
+### 1) 安装依赖
+```bash
 cd puppy-journey
 pnpm install
-2. 配置环境变量
-在 puppy-journey 下创建 .env.local（可参考 .env.example）。
+```
 
-最关键变量（生产建议至少配置）：
+### 2) 配置环境变量
+在 `puppy-journey` 根目录下创建 `.env.local` 文件。
 
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY
-SUPABASE_SERVICE_ROLE_KEY
-AI 相关（按需）：
+**最低必需配置：**
+```env
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
 
-PIPELINE_SCRIPT_LLM_API_KEY
-PIPELINE_SCRIPT_LLM_BASE_URL
-PIPELINE_SCRIPT_LLM_MODEL（或 PIPELINE_SCRIPT_LLM_ENDPOINT_ID）
-VOLCENGINE_Q_AVATAR_API_KEY
-VOLCENGINE_Q_AVATAR_ENDPOINT_ID
-PIPELINE_VIDEO_API_KEY
-PIPELINE_VIDEO_BASE_URL
-PIPELINE_VIDEO_MODEL
-PIPELINE_VIDEO_PROVIDER
-3. 启动开发服务器
+**AI 模块可选配置：**
+```env
+PIPELINE_SCRIPT_LLM_API_KEY=xxx
+PIPELINE_SCRIPT_LLM_BASE_URL=xxx
+PIPELINE_SCRIPT_LLM_MODEL=xxx # 或 PIPELINE_SCRIPT_LLM_ENDPOINT_ID
+
+VOLCENGINE_Q_AVATAR_API_KEY=xxx
+VOLCENGINE_Q_AVATAR_ENDPOINT_ID=xxx
+
+PIPELINE_VIDEO_API_KEY=xxx
+PIPELINE_VIDEO_BASE_URL=xxx
+PIPELINE_VIDEO_MODEL=xxx
+PIPELINE_VIDEO_PROVIDER=xxx
+```
+
+### 3) 本地运行
+```bash
 pnpm dev
-默认访问：http://localhost:3000
+```
+启动后，默认访问地址为：`http://localhost:3000`
 
-部署（Vercel）
-本仓库是 monorepo，部署 puppy-journey 时请注意：
+---
 
-Root Directory 设为：puppy-journey
-Framework 选择：Next.js
-在 Vercel 项目中配置上述环境变量（尤其 Supabase 三项）
+## 8. 部署说明（Vercel）
+
+本项目仓库为 Monorepo 结构，在 Vercel 导入时请将 **Root Directory** 设置为 `puppy-journey`。
+
+- **Framework Preset** 选择 `Next.js`。
+- 请务必在 Vercel 项目设置的 **Environment Variables** 面板中配置全量环境变量（在首次部署前，优先保证 Supabase 的三项核心密钥配置准确）。
