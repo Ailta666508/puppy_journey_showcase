@@ -6,8 +6,6 @@ Puppy Journey turns shared memories, travel logs, wishes, and achievements into 
 
 **Repository owner and engineer:** Zihan Shen
 
-> **Development history.** The project was initially developed locally before it was organized for GitHub publication, so its early work is not represented by a commit-by-commit public history. This repository is the curated engineering showcase.
-
 ## Product and engineering highlights
 
 - **Context-aware generation:** travel, wish, and achievement data become structured inputs to the learning pipeline instead of remaining isolated product features.
@@ -155,3 +153,5 @@ The repository also includes `scripts/verify-supabase-image-upload.mjs` for vali
 - The Python LangGraph module is a research prototype alongside the integrated Next.js pipeline, not a separately deployed production service.
 - Personalized generation can still be inconsistent; structured output validation and user review remain necessary.
 - Production use would require broader automated tests, monitoring, deletion workflows, and a complete privacy review.
+
+**Note:** This project was initially developed locally. The Git repository was created when the codebase was prepared for publication, so the early development history is unavailable. Subsequent updates are tracked in this repository.
