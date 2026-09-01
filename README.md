@@ -1,207 +1,157 @@
+# Puppy Journey · 滑雪小狗
 
-# 滑雪小狗（Puppy Journey）
+**An AI-native relationship and learning application built as a full-stack, multimodal product prototype**
 
-> AI-native 的异地情侣互动与共同成长应用。  
-> 通过多智能体编排将“日常陪伴数据”转化为“可互动学习内容”，形成从情感记录到能力共建的完整闭环。
+Puppy Journey turns shared memories, travel logs, wishes, and achievements into interactive learning experiences for long-distance couples. Its central feature, the **Future Rehearsal Room**, orchestrates multiple AI stages to transform personal context into a scenario, bilingual dialogue, key-frame image, video task, vocabulary cards, and pronunciation support.
 
----
+**Repository owner and engineer:** Zihan Shen
 
-## 1. 项目概述
+> **Development history.** The project was initially developed locally before it was organized for GitHub publication, so its early work is not represented by a commit-by-commit public history. This repository is the curated engineering showcase.
 
-一个以情侣双人关系为核心的数据与交互系统，面向“长期异地、共同成长”的使用场景。  
-系统不仅提供基础的记录功能（旅行、心愿、成就），更具备多模态生成能力（定制剧本、图像、视频、词汇卡），并通过可编排的 AI Pipeline 贯通数据流与业务流。
+## Product and engineering highlights
 
-### 核心价值
-- **关系维度**：提升异地关系中的陪伴连续性与互动参与感。
-- **能力维度**：将记忆资产转化为个性化学习资产（未来排练室）。
-- **工程维度**：采用模块化、多模型选型可切换的 AI 基建，支持系统快速迭代与鲁棒运行。
+- **Context-aware generation:** travel, wish, and achievement data become structured inputs to the learning pipeline instead of remaining isolated product features.
+- **Multi-agent orchestration:** a LangGraph DAG separates perception, fusion, script generation, media tasks, and learning-card generation.
+- **Multimodal workflow:** text, audio context, and image context feed a pipeline that can dispatch text-to-image and image-to-video providers.
+- **Structured model contracts:** generated scripts use typed JSON with speakers, translations, and timestamps so the UI can render deterministic dialogue sequences.
+- **Provider abstraction and fallback:** OpenAI-compatible text models and Volcengine media services are configured behind server routes, with mock paths for local development.
+- **Full-stack data flow:** Next.js route handlers connect React views to Supabase PostgreSQL, Auth, and Storage.
+- **Relationship-scoped isolation:** `couple_id` is the core workspace boundary for travel, wishes, achievements, and shared state.
+- **Server-side credential boundary:** privileged keys remain in server-only environment variables rather than `NEXT_PUBLIC_*` configuration.
 
----
+```mermaid
+flowchart LR
+    A[Travel, wishes, achievements] --> B[Relationship-scoped context]
+    C[Text input] --> D[Perception agents]
+    E[Audio context] --> D
+    F[Image context] --> D
+    B --> D
+    D --> G[Multimodal fusion]
+    G --> H[Structured bilingual script]
+    H --> I[Key-frame image task]
+    I --> J[Video generation task]
+    H --> K[Vocabulary cards]
+    H --> L[SOS pronunciation helper]
+    J --> M[Interactive rehearsal UI]
+    K --> M
+    L --> M
+```
 
-## 2. 核心技术亮点
+## Future Rehearsal Room
 
-### 2.1 LangGraph 多智能体编排（未来排练室）
+The prototype in `rehearsal_backend` models the primary agent graph as:
 
-项目在 `rehearsal_backend` 模块中实现了基于 LangGraph 的有向无环图（DAG）编排原型，其典型流水线流程为：
+```text
+START → perception → fusion → script → media → END
+```
 
-`START -> perception -> fusion -> script -> media -> END`
+### Agent responsibilities
 
-#### 智能体 (Agent) 节点拆分策略
-- **Perception 感知层（并发执行）**
-  - **文本解析 Agent**：识别用户学习目标与语义意图。
-  - **语音线索 Agent**：抽取情绪特征与表达节奏信息。
-  - **图像场景 Agent**：解析视觉上下文与场景元素。
-- **Fusion 融合层**
-  - **多模态融合 Agent**：聚合多维特征，生成统一语料与教学导向。
-- **Script 生成层**
-  - **剧本生成 Agent**：输出包含角色设定与时间戳的结构化 JSON 数据。
-- **Media 媒体层（并发执行）**
-  - **视频任务 Agent**：发起并调度下游视频生成任务。
-  - **词汇卡 Agent**：从剧本中自动提取并构建可学习词条。
-- **SOS 旁路系统**
-  - 单句发音与跟读辅助，作为独立于主 DAG 的实时低延迟旁路能力。
+| Stage | Responsibility |
+| --- | --- |
+| Text perception | infer learning intent and relevant entities from user text and relationship context |
+| Audio perception | estimate emotional tone and speaking cues from supplied context |
+| Visual perception | identify scene and atmosphere cues from images |
+| Fusion | combine the three modalities into a consistent learning brief |
+| Script | produce timestamped NPC and learner dialogue as structured JSON |
+| Media | dispatch image/video work and derive vocabulary cards |
+| SOS side path | return low-latency pronunciation and shadowing guidance for one line |
 
----
+The LLM access layer is separated from graph state and business logic, allowing model endpoints to change without rewriting node orchestration.
 
-### 2.2 AI-native 数据闭环
+## Full-stack architecture
 
-系统实现了业务数据向 AI 上下文的原生注入，而非传统的离散 Prompt 拼接：
+| Layer | Technology and role |
+| --- | --- |
+| Web application | Next.js 16 App Router, React 19, TypeScript |
+| UI and motion | Tailwind CSS, shadcn, Framer Motion |
+| Client state | Zustand with persistence where appropriate |
+| Backend-for-frontend | Next.js Route Handlers |
+| Data and identity | Supabase PostgreSQL, anonymous Auth, Storage |
+| Agent graph | LangGraph prototype plus server-side pipeline routes |
+| Text generation | OpenAI-compatible model endpoints |
+| Media generation | Volcengine image and Seedance video tasks, with mock modes |
 
-- **上游数据源**：旅行日志、心愿墙、成就系统等非结构化与结构化记录。
-- **中游编排层**：脚本生成、关键帧图像生成、视频渲染任务调度。
-- **下游交互层**：剧场视图、角色台词流、互动词汇卡、SOS 跟读辅助。
+## Product modules
 
-该闭环机制使得 AI 生成内容具备极强的个体化特征与关系语境一致性，有效抑制模型幻觉。
+- **Couple onboarding:** create or join a room by invitation, bind two partner roles, and establish the shared workspace.
+- **Relationship dashboard:** visualize reunion and distance-period countdowns alongside progress signals.
+- **Travel timeline:** store structured entries and images, then derive consistent cartoon-style assets.
+- **Wish wall:** manage shared goals and connect them with locations and future trips.
+- **Achievement system:** coordinate personal and partner tasks, presence, focus timers, and relationship feedback.
+- **Learning rehearsal:** combine generated dialogue, media, vocabulary, and SOS pronunciation assistance.
 
----
+## Selected API surface
 
-### 2.3 旅行日志的 AI 图像扩展（Q版生成）
+```text
+POST /api/couple/create-room       POST /api/couple/join
+GET  /api/couple/me                POST /api/couple/set-role
+GET  /api/travel-logs              POST /api/travel-logs
+POST /api/travel-logs/upload-photo GET  /api/wishes
+POST /api/achievements/bootstrap   GET  /api/achievements/tasks
+POST /api/pipeline/script          POST /api/pipeline/image
+POST /api/pipeline/video/start     GET  /api/pipeline/jobs/[id]
+GET  /api/rehearsal                POST /api/rehearsal/sos
+```
 
-旅行模块支持结构化数据记录与图像多媒体上传，并在此基础上扩展了 Q 版图像生成能力：
+## Repository structure
 
-- **多模态融合输入**：支持多图参考输入（用户真实图 + 风格参考图）。
-- **一致性约束**：通过固定风格约束 prompt，保持线条小狗 IP 角色的造型一致性。
-- **资产沉淀**：输出内容直接落库，用于前端回忆时间线展示及后续多媒体学习素材的生成。
+```text
+.
+├── puppy-journey/       # Next.js application, APIs, migrations, and UI
+└── rehearsal_backend/   # LangGraph orchestration prototype and LLM wrapper
+```
 
-从系统架构视角，旅行模块不仅是关系数据的存储层，更是整个 AI 生成链路的高质量语义数据源。
+The Vercel root directory should be set to `puppy-journey`.
 
----
+## Local setup
 
-## 3. 技术栈
+Requirements: Node.js compatible with Next.js 16 and `pnpm`.
 
-- **Web 框架**：Next.js（App Router）+ React + TypeScript
-- **样式系统**：Tailwind CSS
-- **状态管理**：Zustand（含状态持久化）
-- **后端接口层**：Next.js Route Handlers（BFF，Backend for Frontend）
-- **数据与鉴权基础设施**：Supabase（PostgreSQL + Auth + Storage）
-- **AI 能力层**：
-  - OpenAI-compatible 协议（脚本及文本类生成）
-  - 火山引擎（Q 版图像生成、视频流能力接入）
-  - Provider 抽象层（支持 mock / http 快速切换）
-
----
-
-## 4. 安全与数据边界
-
-- 以 `couple_id` 作为核心数据隔离边界，保障多租户场景下的数据安全。
-- API 接口层执行严格的工作区上下文校验（例如：情侣绑定关系上下文、Bearer Token 用户身份校验）。
-- 服务端高权限或敏感操作统一通过 `SUPABASE_SERVICE_ROLE_KEY` 闭环执行，防止越权。
-- 前端环境严格限制变量暴露，仅允许 `NEXT_PUBLIC_*` 级别的环境变量透出。
-
----
-
-## 5. 关键业务模块
-
-### 情侣空间（Onboarding）
-- 匿名进入、角色绑定设置。
-- 支持邀请码机制建房与加入。
-- 双方配对握手成功后，解锁并进入主业务流程。
-
-### 主页（关系状态可视化）
-- 双核心目标进度追踪（下一次见面倒计时 / 异地分离期结束倒计时）。
-- 引入与成就积分系统联动的动态正反馈机制。
-
-### 旅行日志（Travel）
-- 提供标题、日期、地点、随笔、多图关联的结构化记录表单。
-- 采用时间线 (Timeline) 视图展示，深度集成对象存储服务。
-- 触发 AI Q 版图像生成扩展流程。
-
-### 心愿墙（Wishes）
-- 支持心愿的 CRUD（新建 / 完成 / 删除）操作。
-- 数据状态与地理位置地图、旅行时间线模块深度联动。
-
-### 成就系统（Achievements）
-- 双列任务板设计（自我任务 / 伴侣任务）。
-- 支持高频状态同步、专注模式计时，以及双向互动反馈。
-
-### 未来排练室（Learning）
-- 剧本、关键帧、视频流、交互词汇卡的协同 UI 展示。
-- 串联 脚本生成 -> 图像渲染 -> 视频任务下发 -> 异步轮询的完整 Pipeline。
-- 集成 SOS 跟读与语音辅助功能。
-
----
-
-## 6. 关键 API（节选）
-
-系统接口采用 RESTful 风格与微服务思想设计：
-
-**Couple (关系与鉴权)**
-- `POST /api/couple/create-room`
-- `POST /api/couple/join`
-- `POST /api/couple/leave`
-- `GET  /api/couple/me`
-- `POST /api/couple/set-role`
-
-**Travel / Wishes (业务数据流)**
-- `GET/POST /api/travel-logs`
-- `GET/PUT  /api/travel-logs/[id]`
-- `POST     /api/travel-logs/upload-photo`
-- `GET/POST /api/wishes`
-- `GET/PUT  /api/wishes/[id]`
-
-**Achievements (状态同步)**
-- `POST /api/achievements/bootstrap`
-- `GET  /api/achievements/tasks`
-- `POST /api/achievements/presence`
-- `GET  /api/achievements/bond-summary`
-- `GET  /api/achievements/whisper/read`
-
-**AI Pipeline (多智能体与任务调度)**
-- `POST /api/pipeline/script`
-- `POST /api/pipeline/image`
-- `POST /api/pipeline/video/start`
-- `GET  /api/pipeline/jobs/[id]`
-- `GET  /api/rehearsal`
-- `POST /api/rehearsal/sos`
-- `POST /api/generate-q-avatar`
-
----
-
-## 7. 快速开始
-
-### 1) 安装依赖
 ```bash
 cd puppy-journey
 pnpm install
+cp .env.example .env.local
+pnpm dev
 ```
 
-### 2) 配置环境变量
-在 `puppy-journey` 根目录下创建 `.env.local` 文件。
+Open `http://localhost:3000`.
 
-**最低必需配置：**
+Minimum Supabase configuration:
+
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SUPABASE_SERVICE_ROLE_KEY=your_server_only_service_role_key
 ```
 
-**AI 模块可选配置：**
-```env
-PIPELINE_SCRIPT_LLM_API_KEY=xxx
-PIPELINE_SCRIPT_LLM_BASE_URL=xxx
-PIPELINE_SCRIPT_LLM_MODEL=xxx # 或 PIPELINE_SCRIPT_LLM_ENDPOINT_ID
+AI providers are optional for parts of the interface. The documented mock modes allow pipeline UI development without launching billable media jobs.
 
-VOLCENGINE_Q_AVATAR_API_KEY=xxx
-VOLCENGINE_Q_AVATAR_ENDPOINT_ID=xxx
+## Validation
 
-PIPELINE_VIDEO_API_KEY=xxx
-PIPELINE_VIDEO_BASE_URL=xxx
-PIPELINE_VIDEO_MODEL=xxx
-PIPELINE_VIDEO_PROVIDER=xxx
-```
+The curated showcase passed ESLint and a complete Next.js production build on **2026-09-01**, including TypeScript checking and static-page generation.
 
-### 3) 本地运行
+Before deployment, run:
+
 ```bash
-pnpm dev
+cd puppy-journey
+pnpm lint
+pnpm build
 ```
-启动后，默认访问地址为：`http://localhost:3000`
 
----
+The repository also includes `scripts/verify-supabase-image-upload.mjs` for validating authorized storage upload behavior against a configured Supabase project.
 
-## 8. 部署说明（Vercel）
+## Security and data boundaries
 
-本项目仓库为 Monorepo 结构，在 Vercel 导入时请将 **Root Directory** 设置为 `puppy-journey`。
+- Never commit `.env.local`, service-role credentials, media-provider keys, or production customer data.
+- `SUPABASE_SERVICE_ROLE_KEY` must remain server-side; do not rename it with a `NEXT_PUBLIC_` prefix.
+- Every protected route should validate both user identity and couple-workspace membership.
+- Generated media URLs and uploaded photos should follow explicit storage access policies.
+- The included showcase assets and mock output are development examples, not a production dataset.
 
-- **Framework Preset** 选择 `Next.js`。
-- 请务必在 Vercel 项目设置的 **Environment Variables** 面板中配置全量环境变量（在首次部署前，优先保证 Supabase 的三项核心密钥配置准确）。
-"# puppy" 
+## Limitations
+
+- Live media generation depends on external provider availability, quotas, and asynchronous polling.
+- The Python LangGraph module is a research prototype alongside the integrated Next.js pipeline, not a separately deployed production service.
+- Personalized generation can still be inconsistent; structured output validation and user review remain necessary.
+- Production use would require broader automated tests, monitoring, deletion workflows, and a complete privacy review.

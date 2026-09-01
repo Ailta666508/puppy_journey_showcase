@@ -69,6 +69,8 @@ function AvatarSlot({ presence, variant }: { presence: UserPresence; variant: "m
         transition={focusing ? { duration: 2.2, repeat: Infinity, ease: "easeInOut" } : { duration: 0.3 }}
       >
         <div className="relative h-10 w-10 overflow-hidden rounded-full bg-white">
+          {/* Dynamic role avatars may be data URLs or provider-hosted URLs. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={avatarSrc}
             alt=""

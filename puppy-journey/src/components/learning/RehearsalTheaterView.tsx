@@ -327,7 +327,7 @@ export function RehearsalTheaterView() {
       setPipelineLoading(false);
       setPipelineStep("");
     }
-  }, [userText, imageDataUrl, useDefaultSceneText, userId, latestTravelLog]);
+  }, [userText, imageDataUrl, useDefaultSceneText, latestTravelLog]);
 
   const runSos = useCallback(async () => {
     setSosLoading(true);

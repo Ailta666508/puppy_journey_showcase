@@ -38,7 +38,7 @@ export function MyStatusEditor({ open, presence, onClose, onSaved }: Props) {
     setIcon((slot.statusIcon as IconName | null) ?? null);
     setWhisper("");
     setErr("");
-  }, [open, presence.me.statusText, presence.me.statusIcon]);
+  }, [open, presence.me]);
 
   async function save() {
     setErr("");
@@ -98,6 +98,8 @@ export function MyStatusEditor({ open, presence, onClose, onSaved }: Props) {
                 <span className="text-sm font-medium">头像</span>
                 <div className="flex flex-wrap items-center gap-3">
                   <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border bg-white shadow-sm">
+                    {/* Dynamic role avatars may be data URLs or provider-hosted URLs. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={fixedAvatarSrc}
                       alt=""

@@ -28,19 +28,6 @@ function seasonLabel(season: Season) {
   }
 }
 
-function seasonGradient(season: Season) {
-  switch (season) {
-    case "spring":
-      return "from-emerald-50 via-sky-50 to-rose-50 dark:from-emerald-950/40 dark:via-sky-950/40 dark:to-rose-950/30";
-    case "summer":
-      return "from-sky-50 via-amber-50 to-lime-50 dark:from-sky-950/40 dark:via-amber-950/30 dark:to-lime-950/30";
-    case "autumn":
-      return "from-orange-50 via-amber-50 to-red-50 dark:from-orange-950/40 dark:via-amber-950/30 dark:to-red-950/30";
-    case "winter":
-      return "from-slate-50 via-sky-50 to-indigo-50 dark:from-slate-950/50 dark:via-sky-950/40 dark:to-indigo-950/30";
-  }
-}
-
 export function SeasonScene(props: { className?: string }) {
   const season = useMemo(() => getSeasonByMonth(new Date().getMonth() + 1), []);
 
@@ -96,4 +83,3 @@ export function SeasonScene(props: { className?: string }) {
     </div>
   );
 }
-

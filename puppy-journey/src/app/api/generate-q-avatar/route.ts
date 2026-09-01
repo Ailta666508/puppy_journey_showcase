@@ -91,7 +91,7 @@ const MULTI_IMAGE_PROMPT = `我传入了一组图片。第一张图是真人照�
 将第一张图中的人物重绘为一只Q版小狗：男生用黄色小狗（与yellow.png一致），女生用白色小狗（与white.png一致）。严格保留原图人物的动作和手持物品。
 
 具体规则：re.png为肢体结构参考（直立或四肢着地）；white.png、yellow.png为小狗头与身体的唯一造型参考，精准复刻用户上传的肢体动作与姿态（手臂角度、手部、身体朝向、头部角度）。配件（手机、花枝、书本等）风格与小狗线条一致。画面比例与用户图一致（竖版 9:16 或 1:1），小狗自然融入原场景，光影透视匹配。
-
+`;
 
 /** GET：校验 style_refs 是否被正确读取，返回找到的图片相对路径与数量。 */
 export async function GET() {
@@ -159,4 +159,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
-
