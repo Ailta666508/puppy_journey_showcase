@@ -41,3 +41,27 @@ export type StartVideoInput = {
    */
   firstFrameImageUrl?: string;
 };
+
+export const REHEARSAL_STAGES = ["context", "script", "image", "video", "learning"] as const;
+
+export type RehearsalStage = (typeof REHEARSAL_STAGES)[number];
+export type RehearsalStageStatus = "pending" | "ready" | "running" | "completed" | "failed";
+export type RehearsalRunStatus = "queued" | "running" | "completed" | "failed";
+
+export type RehearsalStageState = {
+  status: RehearsalStageStatus;
+  attempt: number;
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+};
+
+export type RehearsalRunState = {
+  id: string;
+  coupleId: string;
+  authorId: string;
+  status: RehearsalRunStatus;
+  stages: Record<RehearsalStage, RehearsalStageState>;
+  createdAt: string;
+  updatedAt: string;
+};
