@@ -57,6 +57,7 @@ export type RehearsalStageState = {
 };
 
 export type RehearsalRunState = {
+  schemaVersion: 1;
   id: string;
   coupleId: string;
   authorId: string;

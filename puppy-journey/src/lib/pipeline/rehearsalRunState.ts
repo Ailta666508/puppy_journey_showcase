@@ -35,6 +35,7 @@ export function createRehearsalRunState(input: NewRunInput): RehearsalRunState {
   ) as RehearsalRunState["stages"];
 
   return {
+    schemaVersion: 1,
     id: input.id,
     coupleId: input.coupleId,
     authorId: input.authorId,
