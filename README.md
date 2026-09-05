@@ -57,6 +57,8 @@ START → perception → fusion → script → media → END
 
 The LLM access layer is separated from graph state and business logic, allowing model endpoints to change without rewriting node orchestration.
 
+Script creation accepts an `idempotency_key` and returns the persisted run state on repeated requests. A client can resend the same payload with `retry_failed: true` after a failed script attempt; the route atomically claims that failed job, preserves the completed context stage, increments the script attempt, and prevents concurrent retries from dispatching duplicate model calls.
+
 ## Full-stack architecture
 
 | Layer | Technology and role |

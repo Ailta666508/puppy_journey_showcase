@@ -9,9 +9,14 @@ import {
   createRunningScriptRun,
   normalizeRehearsalIdempotencyKey,
   rehearsalRequestFingerprint,
+  resumeFailedScriptRun,
   type RehearsalScriptInput,
 } from "@/lib/pipeline/rehearsalScriptRun.server";
-import { completeRehearsalStage, failRehearsalStage } from "@/lib/pipeline/rehearsalRunState";
+import {
+  completeRehearsalStage,
+  failRehearsalStage,
+} from "@/lib/pipeline/rehearsalRunState";
+import type { RehearsalRunState } from "@/lib/pipeline/types";
 import { generateLessonScript } from "@/lib/pipeline/service";
 
 export const maxDuration = 120;
@@ -42,7 +47,9 @@ function replayResponse(row: Record<string, unknown>, fingerprint: string) {
       script: row.script_json ?? undefined,
       pipeline_job_id: row.id,
       run,
-      error: failed ? run.stages.script.error ?? row.error_message ?? "failed" : undefined,
+      error: failed
+        ? (run.stages.script.error ?? row.error_message ?? "failed")
+        : undefined,
     },
     { status: failed ? 409 : scriptStatus === "completed" ? 200 : 202 },
   );
@@ -54,17 +61,32 @@ export async function POST(req: Request) {
     if (!gate.ok) return gate.response;
     const { supabase, coupleId, userId } = gate.ctx;
 
-    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    const body = (await req.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
     const input: RehearsalScriptInput = {
       userText: typeof body.user_text === "string" ? body.user_text : "",
-      imageDescription: typeof body.image_description === "string" ? body.image_description : "",
+      imageDescription:
+        typeof body.image_description === "string"
+          ? body.image_description
+          : "",
       userImageDataUrl:
-        typeof body.user_image_data_url === "string" ? body.user_image_data_url : "",
-      userImageUrl: typeof body.user_image_url === "string" ? body.user_image_url.trim() : "",
+        typeof body.user_image_data_url === "string"
+          ? body.user_image_data_url
+          : "",
+      userImageUrl:
+        typeof body.user_image_url === "string"
+          ? body.user_image_url.trim()
+          : "",
       contextAchievements:
-        typeof body.context_achievements === "string" ? body.context_achievements : "",
-      contextTravel: typeof body.context_travel === "string" ? body.context_travel : "",
-      contextWishes: typeof body.context_wishes === "string" ? body.context_wishes : "",
+        typeof body.context_achievements === "string"
+          ? body.context_achievements
+          : "",
+      contextTravel:
+        typeof body.context_travel === "string" ? body.context_travel : "",
+      contextWishes:
+        typeof body.context_wishes === "string" ? body.context_wishes : "",
     };
 
     let idempotencyKey: string | undefined;
@@ -90,45 +112,94 @@ export async function POST(req: Request) {
       if (error) throw error;
       return data as Record<string, unknown> | null;
     };
-    const existing = await findExisting();
-    if (existing) return replayResponse(existing, requestFingerprint);
-
     const now = new Date().toISOString();
-    const runningRun = createRunningScriptRun({ coupleId, authorId: userId, now });
-    const persisted = rehearsalRunToPersistence(runningRun);
-    const { data: jobRow, error: insErr } = await supabase
-      .from("rehearsal_pipeline_jobs")
-      .insert({
-        id: runningRun.id,
-        couple_id: coupleId,
-        author_id: userId,
-        idempotency_key: idempotencyKey ?? null,
-        request_fingerprint: requestFingerprint,
-        run_state: persisted.run_state,
-        status: "processing",
-        user_text: input.userText || null,
-        image_description: input.imageDescription || null,
-        user_image_url: input.userImageUrl || null,
-        context_achievements: input.contextAchievements || null,
-        context_travel: input.contextTravel || null,
-        context_wishes: input.contextWishes || null,
-        updated_at: now,
-      })
-      .select("id")
-      .single();
-    if (insErr) {
-      if (idempotencyKey && insErr.code === "23505") {
+    const existing = await findExisting();
+    let runningRun: RehearsalRunState;
+    let pipelineJobId: string;
+    let retried = false;
+
+    if (existing) {
+      if (
+        existing.request_fingerprint !== requestFingerprint ||
+        body.retry_failed !== true
+      ) {
+        return replayResponse(existing, requestFingerprint);
+      }
+      const previousRun = rehearsalRunFromPersistence({
+        id: String(existing.id),
+        couple_id: String(existing.couple_id),
+        author_id: String(existing.author_id),
+        run_state: existing.run_state,
+        created_at: String(existing.created_at),
+        updated_at: String(existing.updated_at),
+      });
+      if (previousRun.stages.script.status !== "failed") {
+        return replayResponse(existing, requestFingerprint);
+      }
+      runningRun = resumeFailedScriptRun(previousRun, now);
+      pipelineJobId = String(existing.id);
+      retried = true;
+      const { data: claimedRetry, error: retryErr } = await supabase
+        .from("rehearsal_pipeline_jobs")
+        .update({
+          status: "processing",
+          error_message: null,
+          run_state: rehearsalRunToPersistence(runningRun).run_state,
+          updated_at: now,
+        })
+        .eq("id", pipelineJobId)
+        .eq("couple_id", coupleId)
+        .eq("author_id", userId)
+        .eq("status", "failed")
+        .select("id")
+        .maybeSingle();
+      if (retryErr) throw retryErr;
+      if (!claimedRetry) {
         const raced = await findExisting();
         if (raced) return replayResponse(raced, requestFingerprint);
+        throw new Error("Failed rehearsal run disappeared before retry");
       }
-      throw insErr;
+    } else {
+      runningRun = createRunningScriptRun({ coupleId, authorId: userId, now });
+      const persisted = rehearsalRunToPersistence(runningRun);
+      const { data: jobRow, error: insErr } = await supabase
+        .from("rehearsal_pipeline_jobs")
+        .insert({
+          id: runningRun.id,
+          couple_id: coupleId,
+          author_id: userId,
+          idempotency_key: idempotencyKey ?? null,
+          request_fingerprint: requestFingerprint,
+          run_state: persisted.run_state,
+          status: "processing",
+          user_text: input.userText || null,
+          image_description: input.imageDescription || null,
+          user_image_url: input.userImageUrl || null,
+          context_achievements: input.contextAchievements || null,
+          context_travel: input.contextTravel || null,
+          context_wishes: input.contextWishes || null,
+          updated_at: now,
+        })
+        .select("id")
+        .single();
+      if (insErr) {
+        if (idempotencyKey && insErr.code === "23505") {
+          const raced = await findExisting();
+          if (raced) return replayResponse(raced, requestFingerprint);
+        }
+        throw insErr;
+      }
+      pipelineJobId = jobRow.id as string;
     }
-    const pipelineJobId = jobRow.id as string;
 
     try {
       const script = await generateLessonScript(input);
       const completedAt = new Date().toISOString();
-      const completedRun = completeRehearsalStage(runningRun, "script", completedAt);
+      const completedRun = completeRehearsalStage(
+        runningRun,
+        "script",
+        completedAt,
+      );
       const { error: upErr } = await supabase
         .from("rehearsal_pipeline_jobs")
         .update({
@@ -145,11 +216,17 @@ export async function POST(req: Request) {
         script,
         pipeline_job_id: pipelineJobId,
         run: completedRun,
+        retried,
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       const failedAt = new Date().toISOString();
-      const failedRun = failRehearsalStage(runningRun, "script", message, failedAt);
+      const failedRun = failRehearsalStage(
+        runningRun,
+        "script",
+        message,
+        failedAt,
+      );
       await supabase
         .from("rehearsal_pipeline_jobs")
         .update({

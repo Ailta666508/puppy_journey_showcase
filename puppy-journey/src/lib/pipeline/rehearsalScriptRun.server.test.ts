@@ -4,7 +4,9 @@ import {
   createRunningScriptRun,
   normalizeRehearsalIdempotencyKey,
   rehearsalRequestFingerprint,
+  resumeFailedScriptRun,
 } from "./rehearsalScriptRun.server";
+import { failRehearsalStage } from "./rehearsalRunState";
 
 const input = {
   userText: "Practise ordering coffee",
@@ -30,7 +32,10 @@ describe("rehearsal script run", () => {
   it("fingerprints canonical request fields and detects changed input", () => {
     const first = rehearsalRequestFingerprint(input);
     const repeated = rehearsalRequestFingerprint({ ...input });
-    const changed = rehearsalRequestFingerprint({ ...input, userText: "Order dinner" });
+    const changed = rehearsalRequestFingerprint({
+      ...input,
+      userText: "Order dinner",
+    });
 
     expect(first).toMatch(/^[a-f0-9]{64}$/);
     expect(repeated).toBe(first);
@@ -46,8 +51,51 @@ describe("rehearsal script run", () => {
     });
 
     expect(run.status).toBe("running");
-    expect(run.stages.context).toMatchObject({ status: "completed", attempt: 1 });
+    expect(run.stages.context).toMatchObject({
+      status: "completed",
+      attempt: 1,
+    });
     expect(run.stages.script).toMatchObject({ status: "running", attempt: 1 });
     expect(run.stages.image.status).toBe("pending");
+  });
+
+  it("retries the failed script attempt without repeating context", () => {
+    const running = createRunningScriptRun({
+      id: "run-1",
+      coupleId: "couple-1",
+      authorId: "profile-1",
+      now: "2026-09-04T09:00:00.000Z",
+    });
+    const failed = failRehearsalStage(
+      running,
+      "script",
+      "provider timeout",
+      "2026-09-04T09:01:00.000Z",
+    );
+    const retried = resumeFailedScriptRun(failed, "2026-09-04T09:02:00.000Z");
+
+    expect(retried.status).toBe("running");
+    expect(retried.stages.context).toMatchObject({
+      status: "completed",
+      attempt: 1,
+    });
+    expect(retried.stages.script).toMatchObject({
+      status: "running",
+      attempt: 2,
+    });
+    expect(retried.stages.script.error).toBeUndefined();
+  });
+
+  it("rejects retrying a script stage that has not failed", () => {
+    const running = createRunningScriptRun({
+      id: "run-1",
+      coupleId: "couple-1",
+      authorId: "profile-1",
+      now: "2026-09-04T09:00:00.000Z",
+    });
+
+    expect(() =>
+      resumeFailedScriptRun(running, "2026-09-04T09:02:00.000Z"),
+    ).toThrow("script stage must be failed");
   });
 });
