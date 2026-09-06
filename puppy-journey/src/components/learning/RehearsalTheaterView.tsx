@@ -13,6 +13,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  asFailedRehearsalScriptRetry,
+  createRehearsalScriptRequest,
+  type RehearsalScriptRequestBody,
+} from "@/lib/pipeline/rehearsalClientRun";
 import { DEFAULT_PIPELINE_IMAGE_CONTEXT_ZH } from "@/lib/pipeline/prompts";
 import type { LessonScript } from "@/lib/pipeline/types";
 import { getApiErrorField, getErrorMessage } from "@/lib/getErrorMessage";
@@ -78,6 +83,7 @@ export function RehearsalTheaterView() {
   const [pipelineLoading, setPipelineLoading] = useState(false);
   const [pipelineStep, setPipelineStep] = useState("");
   const [pipelineError, setPipelineError] = useState<string | null>(null);
+  const [canResumePipeline, setCanResumePipeline] = useState(false);
   const [script, setScript] = useState<LessonScript | null>(null);
   const [keyImageUrl, setKeyImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -86,6 +92,7 @@ export function RehearsalTheaterView() {
   const [playProgress, setPlayProgress] = useState(0);
   const playStartRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
+  const lastScriptRequestRef = useRef<RehearsalScriptRequestBody | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -205,45 +212,64 @@ export function RehearsalTheaterView() {
     setUseDefaultSceneText(true);
   }, []);
 
-  const runFullPipeline = useCallback(async () => {
+  const runFullPipeline = useCallback(async (resumeSavedRequest = false) => {
     setPipelineError(null);
     setPipelineLoading(true);
     setVideoUrl(null);
     try {
+      if (resumeSavedRequest && !lastScriptRequestRef.current) {
+        throw new Error("没有可恢复的排练任务，请重新开始");
+      }
       const fromLogPhotos = latestTravelLog ? normalizePhotoUrls(latestTravelLog.photoUrls as unknown) : [];
       const travelFirstPhoto = fromLogPhotos[0]?.trim() ?? "";
-      const effectiveUserImage = (imageDataUrl?.trim() || travelFirstPhoto).trim();
+      const currentUserImage = (imageDataUrl?.trim() || travelFirstPhoto).trim();
+      const effectiveUserImage = resumeSavedRequest
+        ? lastScriptRequestRef.current!.user_image_data_url
+        : currentUserImage;
       const imageDescription =
-        effectiveUserImage
-          ? ""
-          : useDefaultSceneText
-            ? DEFAULT_PIPELINE_IMAGE_CONTEXT_ZH
-            : "（用户未提供旅行照片或参考图，请仅根据上方用户文字创作剧本；可适当推断与旅行相关的场景氛围。）";
+        resumeSavedRequest
+          ? lastScriptRequestRef.current!.image_description
+          : effectiveUserImage
+            ? ""
+            : useDefaultSceneText
+              ? DEFAULT_PIPELINE_IMAGE_CONTEXT_ZH
+              : "（用户未提供旅行照片或参考图，请仅根据上方用户文字创作剧本；可适当推断与旅行相关的场景氛围。）";
       const contextTravel =
-        latestTravelLog != null
-          ? [
-              "【最新一条旅行日记摘要（来自 travel_logs）】",
-              buildDiaryPromptFromLog(latestTravelLog),
-              latestTravelLog.id ? `记录 id：${latestTravelLog.id}` : "",
-            ]
-              .filter(Boolean)
-              .join("\n")
-          : "";
+        resumeSavedRequest
+          ? lastScriptRequestRef.current!.context_travel
+          : latestTravelLog != null
+            ? [
+                "【最新一条旅行日记摘要（来自 travel_logs）】",
+                buildDiaryPromptFromLog(latestTravelLog),
+                latestTravelLog.id ? `记录 id：${latestTravelLog.id}` : "",
+              ]
+                .filter(Boolean)
+                .join("\n")
+            : "";
 
-      setPipelineStep("生成剧本（LLM）…");
+      const requestBody = resumeSavedRequest
+        ? asFailedRehearsalScriptRetry(lastScriptRequestRef.current!)
+        : createRehearsalScriptRequest(
+            {
+              user_text: userText.trim(),
+              image_description: imageDescription,
+              user_image_data_url: effectiveUserImage,
+              user_image_url: /^https?:\/\//i.test(effectiveUserImage) ? effectiveUserImage : "",
+              context_achievements: "",
+              context_travel: contextTravel,
+              context_wishes: "",
+            },
+            crypto.randomUUID(),
+          );
+      if (!resumeSavedRequest) lastScriptRequestRef.current = requestBody;
+      setCanResumePipeline(true);
+
+      setPipelineStep(resumeSavedRequest ? "从已保存进度继续…" : "生成剧本（LLM）…");
       const apiHeaders = await supabaseBearerHeaders();
       const scriptRes = await fetch("/api/pipeline/script", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...apiHeaders },
-        body: JSON.stringify({
-          user_text: userText.trim(),
-          image_description: imageDescription,
-          user_image_data_url: effectiveUserImage,
-          user_image_url: /^https?:\/\//i.test(effectiveUserImage) ? effectiveUserImage : "",
-          context_achievements: "",
-          context_travel: contextTravel,
-          context_wishes: "",
-        }),
+        body: JSON.stringify(requestBody),
       });
       const scriptJson = (await scriptRes.json()) as {
         ok?: boolean;
@@ -321,6 +347,7 @@ export function RehearsalTheaterView() {
       }
       setVideoUrl(finalUrl);
       setPhase("cinema");
+      setCanResumePipeline(false);
     } catch (e) {
       setPipelineError(getErrorMessage(e));
     } finally {
@@ -357,6 +384,8 @@ export function RehearsalTheaterView() {
     setKeyImageUrl(null);
     setScript(null);
     setPipelineError(null);
+    setCanResumePipeline(false);
+    lastScriptRequestRef.current = null;
   }, [stopPlayLoop]);
 
   const vocabCards =
@@ -485,7 +514,21 @@ export function RehearsalTheaterView() {
                   ) : null}
                 </div>
                 {pipelineError ? (
-                  <p className="rounded-md border border-red-400/40 bg-red-950/50 px-3 py-2 text-xs text-red-200">{pipelineError}</p>
+                  <div className="space-y-2 rounded-md border border-red-400/40 bg-red-950/50 px-3 py-2 text-xs text-red-200">
+                    <p>{pipelineError}</p>
+                    {canResumePipeline ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="border-red-300/40 text-red-100 hover:bg-red-900/60"
+                        disabled={pipelineLoading}
+                        onClick={() => void runFullPipeline(true)}
+                      >
+                        从已保存进度继续
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
               <div className="relative flex shrink-0 justify-center px-4 py-3">
@@ -514,7 +557,7 @@ export function RehearsalTheaterView() {
                     type="button"
                     className="pj-btn-gradient px-6"
                     disabled={pipelineLoading || travelLogLoading}
-                    onClick={runFullPipeline}
+                    onClick={() => void runFullPipeline(false)}
                   >
                     {pipelineLoading
                       ? pipelineStep || "生成中…"
