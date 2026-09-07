@@ -6,6 +6,43 @@ Puppy Journey turns shared memories, travel logs, wishes, and achievements into 
 
 **Repository owner and engineer:** Zihan Shen
 
+## Product tour
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/role-selection.png" width="100%" alt="Role selection for the two partners">
+      <br><sub><strong>Couple onboarding.</strong> Each partner enters the shared space through a distinct role.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/relationship-dashboard.png" width="100%" alt="Relationship dashboard with seasonal scene and reunion progress">
+      <br><sub><strong>Relationship dashboard.</strong> A shared seasonal scene and configurable reunion progress.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/travel-journal.png" width="100%" alt="Travel journal editor with photo upload and illustration styles">
+      <br><sub><strong>Travel journal.</strong> Structured memories, multi-image upload, and illustration generation.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/wish-wall.png" width="100%" alt="Wish wall with visited-city map and dated wish cards">
+      <br><sub><strong>Wish wall.</strong> Visited cities and dated wishes share one relationship timeline.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/achievements.png" width="100%" alt="Achievement board with tasks for both partners">
+      <br><sub><strong>Achievements.</strong> Personal and partner tasks feed the shared progress system.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/future-rehearsal-room.png" width="100%" alt="Future Rehearsal Room with generated scene and theater preview">
+      <br><sub><strong>Future Rehearsal Room.</strong> Personal context becomes a staged language-learning scenario.</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>Screenshots show the current application interface with demonstration content. Media generation depends on the configured live or mock provider path.</sub></p>
+
 ## Product and engineering highlights
 
 - **Context-aware generation:** travel, wish, and achievement data become structured inputs to the learning pipeline instead of remaining isolated product features.
@@ -98,6 +135,7 @@ GET  /api/rehearsal                POST /api/rehearsal/sos
 
 ```text
 .
+├── docs/screenshots/    # product interface gallery used in this README
 ├── puppy-journey/       # Next.js application, APIs, migrations, and UI
 └── rehearsal_backend/   # LangGraph orchestration prototype and LLM wrapper
 ```
