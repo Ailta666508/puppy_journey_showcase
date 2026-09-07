@@ -54,23 +54,11 @@ Puppy Journey turns shared memories, travel logs, wishes, and achievements into 
 - **Relationship-scoped isolation:** `couple_id` is the core workspace boundary for travel, wishes, achievements, and shared state.
 - **Server-side credential boundary:** privileged keys remain in server-only environment variables rather than `NEXT_PUBLIC_*` configuration.
 
-```mermaid
-flowchart LR
-    A[Travel, wishes, achievements] --> B[Relationship-scoped context]
-    C[Text input] --> D[Perception agents]
-    E[Audio context] --> D
-    F[Image context] --> D
-    B --> D
-    D --> G[Multimodal fusion]
-    G --> H[Structured bilingual script]
-    H --> I[Key-frame image task]
-    I --> J[Video generation task]
-    H --> K[Vocabulary cards]
-    H --> L[SOS pronunciation helper]
-    J --> M[Interactive rehearsal UI]
-    K --> M
-    L --> M
-```
+<p align="center">
+  <img src="docs/figures/future-rehearsal-architecture.png" width="100%" alt="Future Rehearsal Room architecture from relationship context and multimodal input to bilingual script, media, vocabulary, pronunciation, and interactive rehearsal">
+</p>
+
+<p align="center"><em>Future Rehearsal Room: shared context and multimodal input are fused into a structured bilingual script that drives media and learning support.</em></p>
 
 ## Future Rehearsal Room
 
@@ -135,6 +123,7 @@ GET  /api/rehearsal                POST /api/rehearsal/sos
 
 ```text
 .
+├── docs/figures/        # illustrated system overview
 ├── docs/screenshots/    # product interface gallery used in this README
 ├── puppy-journey/       # Next.js application, APIs, migrations, and UI
 └── rehearsal_backend/   # LangGraph orchestration prototype and LLM wrapper
