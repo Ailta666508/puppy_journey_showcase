@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   createRunningScriptRun,
+  isStaleRunningScriptRun,
   normalizeRehearsalIdempotencyKey,
   rehearsalRequestFingerprint,
   resumeFailedScriptRun,
+  resumeStaleScriptRun,
 } from "./rehearsalScriptRun.server";
 import { failRehearsalStage } from "./rehearsalRunState";
 
@@ -97,5 +99,49 @@ describe("rehearsal script run", () => {
     expect(() =>
       resumeFailedScriptRun(running, "2026-09-04T09:02:00.000Z"),
     ).toThrow("script stage must be failed");
+  });
+
+  it("recovers a stale interrupted script without repeating context", () => {
+    const running = createRunningScriptRun({
+      id: "run-1",
+      coupleId: "couple-1",
+      authorId: "profile-1",
+      now: "2026-09-04T09:00:00.000Z",
+    });
+
+    expect(
+      isStaleRunningScriptRun(running, "2026-09-04T09:02:59.999Z"),
+    ).toBe(false);
+    expect(
+      isStaleRunningScriptRun(running, "2026-09-04T09:03:00.000Z"),
+    ).toBe(true);
+
+    const recovered = resumeStaleScriptRun(
+      running,
+      "2026-09-04T09:03:00.000Z",
+    );
+    expect(recovered.status).toBe("running");
+    expect(recovered.stages.context).toMatchObject({
+      status: "completed",
+      attempt: 1,
+    });
+    expect(recovered.stages.script).toMatchObject({
+      status: "running",
+      attempt: 2,
+      startedAt: "2026-09-04T09:03:00.000Z",
+    });
+  });
+
+  it("does not recover a script request that may still be active", () => {
+    const running = createRunningScriptRun({
+      id: "run-1",
+      coupleId: "couple-1",
+      authorId: "profile-1",
+      now: "2026-09-04T09:00:00.000Z",
+    });
+
+    expect(() =>
+      resumeStaleScriptRun(running, "2026-09-04T09:01:00.000Z"),
+    ).toThrow("not stale enough");
   });
 });

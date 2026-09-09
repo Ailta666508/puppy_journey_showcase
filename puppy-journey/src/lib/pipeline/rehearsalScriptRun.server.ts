@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   completeRehearsalStage,
   createRehearsalRunState,
+  failRehearsalStage,
   retryFailedRehearsalStage,
   startRehearsalStage,
 } from "./rehearsalRunState";
@@ -17,6 +18,8 @@ export type RehearsalScriptInput = {
   contextTravel: string;
   contextWishes: string;
 };
+
+export const REHEARSAL_SCRIPT_STALE_AFTER_MS = 3 * 60 * 1000;
 
 export function normalizeRehearsalIdempotencyKey(
   value: unknown,
@@ -82,4 +85,39 @@ export function resumeFailedScriptRun(
     );
   }
   return retryFailedRehearsalStage(run, "script", now);
+}
+
+export function isStaleRunningScriptRun(
+  run: RehearsalRunState,
+  now: string,
+  staleAfterMs = REHEARSAL_SCRIPT_STALE_AFTER_MS,
+): boolean {
+  if (run.stages.script.status !== "running") return false;
+  if (!Number.isFinite(staleAfterMs) || staleAfterMs <= 0) {
+    throw new ValueError("script stale timeout must be a positive duration");
+  }
+  const nowMs = Date.parse(now);
+  const startedMs = Date.parse(run.stages.script.startedAt ?? "");
+  const updatedMs = Date.parse(run.updatedAt);
+  if (![nowMs, startedMs, updatedMs].every(Number.isFinite)) {
+    throw new ValueError("script recovery requires valid timestamps");
+  }
+  return nowMs - Math.max(startedMs, updatedMs) >= staleAfterMs;
+}
+
+export function resumeStaleScriptRun(
+  run: RehearsalRunState,
+  now: string,
+  staleAfterMs = REHEARSAL_SCRIPT_STALE_AFTER_MS,
+): RehearsalRunState {
+  if (!isStaleRunningScriptRun(run, now, staleAfterMs)) {
+    throw new ValueError("script stage is not stale enough to recover");
+  }
+  const interrupted = failRehearsalStage(
+    run,
+    "script",
+    "Previous script generation was interrupted",
+    now,
+  );
+  return retryFailedRehearsalStage(interrupted, "script", now);
 }

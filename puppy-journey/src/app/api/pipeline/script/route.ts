@@ -7,9 +7,11 @@ import {
 } from "@/lib/pipeline/rehearsalRunPersistence";
 import {
   createRunningScriptRun,
+  isStaleRunningScriptRun,
   normalizeRehearsalIdempotencyKey,
   rehearsalRequestFingerprint,
   resumeFailedScriptRun,
+  resumeStaleScriptRun,
   type RehearsalScriptInput,
 } from "@/lib/pipeline/rehearsalScriptRun.server";
 import {
@@ -133,13 +135,17 @@ export async function POST(req: Request) {
         created_at: String(existing.created_at),
         updated_at: String(existing.updated_at),
       });
-      if (previousRun.stages.script.status !== "failed") {
+      const retryingFailed = previousRun.stages.script.status === "failed";
+      const retryingStale = isStaleRunningScriptRun(previousRun, now);
+      if (!retryingFailed && !retryingStale) {
         return replayResponse(existing, requestFingerprint);
       }
-      runningRun = resumeFailedScriptRun(previousRun, now);
+      runningRun = retryingFailed
+        ? resumeFailedScriptRun(previousRun, now)
+        : resumeStaleScriptRun(previousRun, now);
       pipelineJobId = String(existing.id);
       retried = true;
-      const { data: claimedRetry, error: retryErr } = await supabase
+      let claimRetry = supabase
         .from("rehearsal_pipeline_jobs")
         .update({
           status: "processing",
@@ -150,7 +156,11 @@ export async function POST(req: Request) {
         .eq("id", pipelineJobId)
         .eq("couple_id", coupleId)
         .eq("author_id", userId)
-        .eq("status", "failed")
+        .eq("status", retryingFailed ? "failed" : "processing");
+      if (retryingStale) {
+        claimRetry = claimRetry.eq("updated_at", String(existing.updated_at));
+      }
+      const { data: claimedRetry, error: retryErr } = await claimRetry
         .select("id")
         .maybeSingle();
       if (retryErr) throw retryErr;
