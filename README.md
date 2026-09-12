@@ -84,6 +84,8 @@ The LLM access layer is separated from graph state and business logic, allowing 
 
 Script creation accepts an `idempotency_key` and returns the persisted run state on repeated requests. A client can resend the same payload with `retry_failed: true` after a failed script attempt or after a script request has remained interrupted for three minutes. The route uses an optimistic claim on the stored update timestamp, preserves the completed context stage, increments the script attempt, and prevents concurrent recovery requests from dispatching duplicate model calls.
 
+Key-frame generation now participates in the same persisted state machine. The image route claims the `image` stage by update timestamp, records completion before opening the `video` stage, replays an existing key frame without another provider call, and retries only a recorded failed image attempt.
+
 ## Full-stack architecture
 
 | Layer | Technology and role |
