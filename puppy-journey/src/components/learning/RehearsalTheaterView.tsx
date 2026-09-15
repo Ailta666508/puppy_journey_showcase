@@ -296,27 +296,32 @@ export function RehearsalTheaterView() {
       }
       setKeyImageUrl(imgJson.imageUrl);
 
-      const frameForVideo = effectiveUserImage.trim();
-      setPipelineStep(
-        frameForVideo ? "提交视频任务（图生视频 · 旅行实拍首帧）…" : "提交视频任务（文生视频 · 无旅行配图降级）…",
-      );
+      setPipelineStep("提交视频任务（图生视频 · 使用本轮生成的关键帧）…");
       const vidRes = await fetch("/api/pipeline/video/start", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...apiHeaders },
         body: JSON.stringify({
           pipeline_job_id: pipelineJobId,
-          script: sc,
-          first_frame_image_url: frameForVideo,
         }),
       });
-      const vidJson = (await vidRes.json()) as { ok?: boolean; error?: string; jobId?: string };
+      const vidJson = (await vidRes.json()) as {
+        ok?: boolean;
+        error?: string;
+        jobId?: string;
+        status?: string;
+        videoUrl?: string;
+      };
       if (!vidRes.ok || !vidJson.ok || !vidJson.jobId) {
         throw new Error(getApiErrorField(vidJson.error, "视频任务提交失败"));
       }
 
       setPipelineStep("轮询视频状态…");
-      let finalUrl: string | undefined;
+      let finalUrl =
+        vidJson.status === "completed" && vidJson.videoUrl
+          ? vidJson.videoUrl
+          : undefined;
       for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+        if (finalUrl) break;
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         const st = await fetch(`/api/pipeline/jobs/${encodeURIComponent(vidJson.jobId)}`, {
           headers: { ...apiHeaders },
@@ -360,9 +365,10 @@ export function RehearsalTheaterView() {
     setSosLoading(true);
     setSosText(null);
     try {
+      const headers = await supabaseBearerHeaders();
       const res = await fetch("/api/rehearsal/sos", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ sentence: sosSentence.trim() }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: unknown; text?: string };

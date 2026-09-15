@@ -86,6 +86,8 @@ Script creation accepts an `idempotency_key` and returns the persisted run state
 
 Key-frame generation now participates in the same persisted state machine. The image route claims the `image` stage by update timestamp, records completion before opening the `video` stage, replays an existing key frame without another provider call, and retries only a recorded failed image attempt.
 
+Video generation continues that persisted lifecycle. The server uses the saved script and generated key frame rather than trusting client-supplied media inputs, atomically claims each submission, reuses an in-flight provider task, recovers interrupted submissions, and retries only failed video stages. Authenticated polling records provider failure or completion in the same run state; a completed video also unlocks the script-derived learning cards. Pronunciation assistance is protected by the same couple-workspace authorization boundary.
+
 ## Full-stack architecture
 
 | Layer | Technology and role |
@@ -158,7 +160,7 @@ AI providers are optional for parts of the interface. The documented mock modes 
 
 ## Validation
 
-The curated showcase passed ESLint and a complete Next.js production build on **2026-09-01**, including TypeScript checking and static-page generation.
+The curated showcase passed **29 unit tests**, ESLint, and a complete Next.js production build on **2026-09-15**, including TypeScript checking and static-page generation.
 
 Before deployment, run:
 
