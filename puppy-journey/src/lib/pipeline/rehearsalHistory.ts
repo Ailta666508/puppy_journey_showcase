@@ -13,6 +13,8 @@ export type RehearsalHistoryRun = {
   updatedAt: string;
 };
 
+export type RetryableRehearsalStage = "image" | "video";
+
 const STATUSES = new Set<PipelineJobStatus>(["queued", "processing", "completed", "failed"]);
 
 function optionalString(value: unknown): string | null {
@@ -56,4 +58,18 @@ export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryR
       updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : "",
     }];
   });
+}
+
+export function retryableFailedStage(
+  run: RehearsalHistoryRun,
+): RetryableRehearsalStage | null {
+  const stages = run.runState?.stages;
+  if (!stages || !run.script) return null;
+  if (stages.video?.status === "failed" && stages.image?.status === "completed") {
+    return "video";
+  }
+  if (stages.image?.status === "failed" && stages.script?.status === "completed") {
+    return "image";
+  }
+  return null;
 }

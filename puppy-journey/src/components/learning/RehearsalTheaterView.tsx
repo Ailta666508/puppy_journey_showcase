@@ -20,6 +20,7 @@ import {
 } from "@/lib/pipeline/rehearsalClientRun";
 import {
   parseRehearsalHistoryResponse,
+  retryableFailedStage,
   type RehearsalHistoryRun,
 } from "@/lib/pipeline/rehearsalHistory";
 import { DEFAULT_PIPELINE_IMAGE_CONTEXT_ZH } from "@/lib/pipeline/prompts";
@@ -94,6 +95,7 @@ export function RehearsalTheaterView() {
   const [rehearsalHistory, setRehearsalHistory] = useState<RehearsalHistoryRun[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyRetryId, setHistoryRetryId] = useState<string | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [playProgress, setPlayProgress] = useState(0);
@@ -239,6 +241,44 @@ export function RehearsalTheaterView() {
     setUseDefaultSceneText(true);
   }, []);
 
+  const waitForVideo = useCallback(async (
+    pipelineJobId: string,
+    apiHeaders: HeadersInit,
+    completedVideoUrl?: string,
+  ): Promise<string> => {
+    const finalUrl = completedVideoUrl;
+    setPipelineStep("轮询视频状态…");
+    for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+      if (finalUrl) return finalUrl;
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      const response = await fetch(`/api/pipeline/jobs/${encodeURIComponent(pipelineJobId)}`, {
+        headers: { ...apiHeaders },
+      });
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        error?: unknown;
+        status?: string;
+        videoUrl?: string;
+      };
+      if (!response.ok || !payload.ok) {
+        throw new Error(getApiErrorField(payload.error, "轮询失败"));
+      }
+      if (payload.status === "failed") {
+        throw new Error(getApiErrorField(payload.error, "视频任务失败"));
+      }
+      if (payload.status === "completed") {
+        if (payload.videoUrl) return payload.videoUrl;
+        throw new Error(getApiErrorField(payload.error, "视频已完成但未返回播放地址"));
+      }
+      if (i % 15 === 0 && i > 0) {
+        setPipelineStep(`轮询视频状态…（已等待约 ${Math.round((i * POLL_INTERVAL_MS) / 60_000)} 分钟）`);
+      }
+    }
+    throw new Error(
+      "等待视频超时（约 10 分钟）。若方舟仍在排队，可稍后刷新重试；也可在 Network 里查看 /api/pipeline/jobs 的返回。",
+    );
+  }, []);
+
   const runFullPipeline = useCallback(async (resumeSavedRequest = false) => {
     setPipelineError(null);
     setPipelineLoading(true);
@@ -342,41 +382,11 @@ export function RehearsalTheaterView() {
         throw new Error(getApiErrorField(vidJson.error, "视频任务提交失败"));
       }
 
-      setPipelineStep("轮询视频状态…");
-      let finalUrl =
-        vidJson.status === "completed" && vidJson.videoUrl
-          ? vidJson.videoUrl
-          : undefined;
-      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
-        if (finalUrl) break;
-        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-        const st = await fetch(`/api/pipeline/jobs/${encodeURIComponent(vidJson.jobId)}`, {
-          headers: { ...apiHeaders },
-        });
-        const stj = (await st.json()) as {
-          ok?: boolean;
-          error?: unknown;
-          status?: string;
-          videoUrl?: string;
-        };
-        if (!st.ok || !stj.ok) throw new Error(getApiErrorField(stj.error, "轮询失败"));
-        if (stj.status === "failed") throw new Error(getApiErrorField(stj.error, "视频任务失败"));
-        if (stj.status === "completed") {
-          if (stj.videoUrl) {
-            finalUrl = stj.videoUrl;
-            break;
-          }
-          throw new Error(getApiErrorField(stj.error, "视频已完成但未返回播放地址"));
-        }
-        if (i % 15 === 0 && i > 0) {
-          setPipelineStep(`轮询视频状态…（已等待约 ${Math.round((i * POLL_INTERVAL_MS) / 60_000)} 分钟）`);
-        }
-      }
-      if (!finalUrl) {
-        throw new Error(
-          "等待视频超时（约 10 分钟）。若方舟仍在排队，可稍后刷新重试；也可在 Network 里查看 /api/pipeline/jobs 的返回。",
-        );
-      }
+      const finalUrl = await waitForVideo(
+        vidJson.jobId,
+        apiHeaders,
+        vidJson.status === "completed" ? vidJson.videoUrl : undefined,
+      );
       setVideoUrl(finalUrl);
       setPhase("cinema");
       setCanResumePipeline(false);
@@ -387,7 +397,14 @@ export function RehearsalTheaterView() {
       setPipelineLoading(false);
       setPipelineStep("");
     }
-  }, [userText, imageDataUrl, useDefaultSceneText, latestTravelLog, refreshRehearsalHistory]);
+  }, [
+    userText,
+    imageDataUrl,
+    useDefaultSceneText,
+    latestTravelLog,
+    refreshRehearsalHistory,
+    waitForVideo,
+  ]);
 
   const runSos = useCallback(async () => {
     setSosLoading(true);
@@ -431,6 +448,72 @@ export function RehearsalTheaterView() {
     setCanResumePipeline(false);
     setPhase("cinema");
   }, []);
+
+  const retryHistoricalRun = useCallback(async (run: RehearsalHistoryRun) => {
+    const failedStage = retryableFailedStage(run);
+    if (!failedStage || !run.script) {
+      setPipelineError("这条历史记录无法从媒体阶段恢复，请重新开始排练");
+      return;
+    }
+    setHistoryRetryId(run.id);
+    setPipelineLoading(true);
+    setPipelineError(null);
+    setScript(run.script);
+    try {
+      const apiHeaders = await supabaseBearerHeaders();
+      let imageUrl = run.keyImageUrl;
+      if (failedStage === "image") {
+        setPipelineStep("重试关键帧生成…");
+        const imageResponse = await fetch("/api/pipeline/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...apiHeaders },
+          body: JSON.stringify({ pipeline_job_id: run.id, script: run.script }),
+        });
+        const imagePayload = await imageResponse.json() as {
+          ok?: boolean;
+          error?: unknown;
+          imageUrl?: string;
+        };
+        if (!imageResponse.ok || !imagePayload.ok || !imagePayload.imageUrl) {
+          throw new Error(getApiErrorField(imagePayload.error, "关键帧重试失败"));
+        }
+        imageUrl = imagePayload.imageUrl;
+      }
+      setKeyImageUrl(imageUrl);
+
+      setPipelineStep("重新提交视频任务…");
+      const videoResponse = await fetch("/api/pipeline/video/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...apiHeaders },
+        body: JSON.stringify({ pipeline_job_id: run.id }),
+      });
+      const videoPayload = await videoResponse.json() as {
+        ok?: boolean;
+        error?: unknown;
+        jobId?: string;
+        status?: string;
+        videoUrl?: string;
+      };
+      if (!videoResponse.ok || !videoPayload.ok || !videoPayload.jobId) {
+        throw new Error(getApiErrorField(videoPayload.error, "视频重试失败"));
+      }
+      const finalUrl = await waitForVideo(
+        videoPayload.jobId,
+        apiHeaders,
+        videoPayload.status === "completed" ? videoPayload.videoUrl : undefined,
+      );
+      setVideoUrl(finalUrl);
+      setPhase("cinema");
+      await refreshRehearsalHistory();
+    } catch (error) {
+      setPipelineError(getErrorMessage(error));
+      await refreshRehearsalHistory();
+    } finally {
+      setHistoryRetryId(null);
+      setPipelineLoading(false);
+      setPipelineStep("");
+    }
+  }, [refreshRehearsalHistory, waitForVideo]);
 
   const vocabCards =
     script?.script?.map((line, i) => ({
@@ -615,6 +698,17 @@ export function RehearsalTheaterView() {
                             onClick={() => openHistoricalRun(run)}
                           >
                             打开放映
+                          </Button>
+                        ) : run.status === "failed" && retryableFailedStage(run) ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-red-300/30 px-2 text-[10px] text-red-100"
+                            disabled={historyRetryId != null}
+                            onClick={() => void retryHistoricalRun(run)}
+                          >
+                            {historyRetryId === run.id ? "重试中…" : "重试媒体阶段"}
                           </Button>
                         ) : null}
                       </div>

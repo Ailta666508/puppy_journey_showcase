@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseRehearsalHistoryResponse } from "./rehearsalHistory";
+import {
+  parseRehearsalHistoryResponse,
+  retryableFailedStage,
+  type RehearsalHistoryRun,
+} from "./rehearsalHistory";
 
 const SCRIPT = {
   scene: "Station",
@@ -55,5 +59,33 @@ describe("parseRehearsalHistoryResponse", () => {
 
   it("rejects a response without a run collection", () => {
     expect(() => parseRehearsalHistoryResponse({ ok: true })).toThrow("缺少 runs");
+  });
+
+  it.each([
+    ["image", "failed", "pending", "image"],
+    ["video", "completed", "failed", "video"],
+    ["script", "pending", "pending", null],
+  ])("selects only a retryable failed media stage for %s failures", (_, image, video, expected) => {
+    const run = {
+      id: "run-4",
+      status: "failed",
+      userText: "练习旅行对话",
+      script: SCRIPT,
+      runState: {
+        schemaVersion: 1,
+        stages: {
+          script: { status: expected ? "completed" : "failed", attempt: 1 },
+          image: { status: image, attempt: 1 },
+          video: { status: video, attempt: 1 },
+        },
+      },
+      keyImageUrl: image === "completed" ? "https://example.com/frame.png" : null,
+      videoUrl: null,
+      thumbnailUrl: null,
+      error: "provider timeout",
+      updatedAt: "",
+    } as unknown as RehearsalHistoryRun;
+
+    expect(retryableFailedStage(run)).toBe(expected);
   });
 });
