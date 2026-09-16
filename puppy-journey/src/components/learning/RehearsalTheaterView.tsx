@@ -18,6 +18,10 @@ import {
   createRehearsalScriptRequest,
   type RehearsalScriptRequestBody,
 } from "@/lib/pipeline/rehearsalClientRun";
+import {
+  parseRehearsalHistoryResponse,
+  type RehearsalHistoryRun,
+} from "@/lib/pipeline/rehearsalHistory";
 import { DEFAULT_PIPELINE_IMAGE_CONTEXT_ZH } from "@/lib/pipeline/prompts";
 import type { LessonScript } from "@/lib/pipeline/types";
 import { getApiErrorField, getErrorMessage } from "@/lib/getErrorMessage";
@@ -87,12 +91,35 @@ export function RehearsalTheaterView() {
   const [script, setScript] = useState<LessonScript | null>(null);
   const [keyImageUrl, setKeyImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [rehearsalHistory, setRehearsalHistory] = useState<RehearsalHistoryRun[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   const [playing, setPlaying] = useState(false);
   const [playProgress, setPlayProgress] = useState(0);
   const playStartRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastScriptRequestRef = useRef<RehearsalScriptRequestBody | null>(null);
+
+  const refreshRehearsalHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const headers = await supabaseBearerHeaders();
+      const response = await fetch("/api/pipeline/jobs", { cache: "no-store", headers: { ...headers } });
+      const payload = await response.json() as unknown;
+      if (!response.ok) throw new Error(`排练历史请求失败 ${response.status}`);
+      setRehearsalHistory(parseRehearsalHistoryResponse(payload));
+    } catch (error) {
+      setHistoryError(getErrorMessage(error));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshRehearsalHistory();
+  }, [refreshRehearsalHistory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -353,13 +380,14 @@ export function RehearsalTheaterView() {
       setVideoUrl(finalUrl);
       setPhase("cinema");
       setCanResumePipeline(false);
+      void refreshRehearsalHistory();
     } catch (e) {
       setPipelineError(getErrorMessage(e));
     } finally {
       setPipelineLoading(false);
       setPipelineStep("");
     }
-  }, [userText, imageDataUrl, useDefaultSceneText, latestTravelLog]);
+  }, [userText, imageDataUrl, useDefaultSceneText, latestTravelLog, refreshRehearsalHistory]);
 
   const runSos = useCallback(async () => {
     setSosLoading(true);
@@ -393,6 +421,16 @@ export function RehearsalTheaterView() {
     setCanResumePipeline(false);
     lastScriptRequestRef.current = null;
   }, [stopPlayLoop]);
+
+  const openHistoricalRun = useCallback((run: RehearsalHistoryRun) => {
+    if (!run.videoUrl) return;
+    setScript(run.script);
+    setKeyImageUrl(run.keyImageUrl ?? run.thumbnailUrl);
+    setVideoUrl(run.videoUrl);
+    setPipelineError(null);
+    setCanResumePipeline(false);
+    setPhase("cinema");
+  }, []);
 
   const vocabCards =
     script?.script?.map((line, i) => ({
@@ -536,6 +574,53 @@ export function RehearsalTheaterView() {
                     ) : null}
                   </div>
                 ) : null}
+                <div className="rounded-lg border border-white/10 bg-black/25 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium text-amber-100/85">最近排练</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-[10px] text-white/60"
+                      disabled={historyLoading}
+                      onClick={() => void refreshRehearsalHistory()}
+                    >
+                      {historyLoading ? "同步中…" : "刷新"}
+                    </Button>
+                  </div>
+                  {historyError ? <p className="text-[10px] text-amber-200/80">{historyError}</p> : null}
+                  {!historyLoading && !historyError && rehearsalHistory.length === 0 ? (
+                    <p className="text-[10px] text-white/45">完成一次排练后可从这里重新放映。</p>
+                  ) : null}
+                  <div className="space-y-1.5">
+                    {rehearsalHistory.slice(0, 4).map((run) => (
+                      <div key={run.id} className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11px] text-white/80">{run.userText || "未命名排练"}</p>
+                          <p className="text-[10px] text-white/40">
+                            {run.status === "completed"
+                              ? "已完成"
+                              : run.status === "failed"
+                                ? "生成失败"
+                                : "处理中"}
+                            {run.updatedAt ? ` · ${new Date(run.updatedAt).toLocaleDateString("zh-CN")}` : ""}
+                          </p>
+                        </div>
+                        {run.status === "completed" && run.videoUrl ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 border-amber-300/30 px-2 text-[10px] text-amber-100"
+                            onClick={() => openHistoricalRun(run)}
+                          >
+                            打开放映
+                          </Button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div className="relative flex shrink-0 justify-center px-4 py-3">
                 <AnimatePresence mode="wait">
