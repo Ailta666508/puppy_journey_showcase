@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseRehearsalHistoryResponse,
   retryableFailedStage,
+  summarizeRehearsalProgress,
   type RehearsalHistoryRun,
 } from "./rehearsalHistory";
 
@@ -87,5 +88,45 @@ describe("parseRehearsalHistoryResponse", () => {
     } as unknown as RehearsalHistoryRun;
 
     expect(retryableFailedStage(run)).toBe(expected);
+  });
+
+  it("summarizes persisted stage progress and surfaces the failed frontier", () => {
+    const run = {
+      id: "run-5",
+      status: "failed",
+      userText: "练习旅行对话",
+      script: SCRIPT,
+      runState: {
+        schemaVersion: 1,
+        stages: {
+          context: { status: "completed", attempt: 1 },
+          script: { status: "completed", attempt: 1 },
+          image: { status: "failed", attempt: 2 },
+          video: { status: "pending", attempt: 0 },
+          learning: { status: "pending", attempt: 0 },
+        },
+      },
+      keyImageUrl: null,
+      videoUrl: null,
+      thumbnailUrl: null,
+      error: "provider timeout",
+      updatedAt: "",
+    } as unknown as RehearsalHistoryRun;
+
+    expect(summarizeRehearsalProgress(run)).toEqual({
+      completedStages: 2,
+      totalStages: 5,
+      percent: 40,
+      label: "生成关键帧失败",
+      activeStage: "image",
+    });
+  });
+
+  it("falls back to the terminal job status when legacy history has no stage state", () => {
+    const run = parseRehearsalHistoryResponse({
+      runs: [{ id: "legacy", status: "completed", videoUrl: "movie.mp4" }],
+    })[0]!;
+
+    expect(summarizeRehearsalProgress(run)).toMatchObject({ percent: 100, label: "全部完成" });
   });
 });

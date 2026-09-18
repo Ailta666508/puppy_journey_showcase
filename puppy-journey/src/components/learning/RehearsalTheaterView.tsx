@@ -21,6 +21,7 @@ import {
 import {
   parseRehearsalHistoryResponse,
   retryableFailedStage,
+  summarizeRehearsalProgress,
   type RehearsalHistoryRun,
 } from "@/lib/pipeline/rehearsalHistory";
 import { DEFAULT_PIPELINE_IMAGE_CONTEXT_ZH } from "@/lib/pipeline/prompts";
@@ -676,43 +677,51 @@ export function RehearsalTheaterView() {
                     <p className="text-[10px] text-white/45">完成一次排练后可从这里重新放映。</p>
                   ) : null}
                   <div className="space-y-1.5">
-                    {rehearsalHistory.slice(0, 4).map((run) => (
-                      <div key={run.id} className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-[11px] text-white/80">{run.userText || "未命名排练"}</p>
-                          <p className="text-[10px] text-white/40">
-                            {run.status === "completed"
-                              ? "已完成"
-                              : run.status === "failed"
-                                ? "生成失败"
-                                : "处理中"}
-                            {run.updatedAt ? ` · ${new Date(run.updatedAt).toLocaleDateString("zh-CN")}` : ""}
-                          </p>
+                    {rehearsalHistory.slice(0, 4).map((run) => {
+                      const progress = summarizeRehearsalProgress(run);
+                      return (
+                        <div key={run.id} className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-2">
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <p className="truncate text-[11px] text-white/80">{run.userText || "未命名排练"}</p>
+                            <p className="text-[10px] text-white/40">
+                              {progress.label}
+                              {run.updatedAt ? ` · ${new Date(run.updatedAt).toLocaleDateString("zh-CN")}` : ""}
+                            </p>
+                            <div
+                              className="h-1 overflow-hidden rounded-full bg-white/10"
+                              aria-label={`${progress.completedStages}/${progress.totalStages} stages completed`}
+                            >
+                              <div
+                                className={`h-full rounded-full ${run.status === "failed" ? "bg-red-400/80" : "bg-amber-300/80"}`}
+                                style={{ width: `${progress.percent}%` }}
+                              />
+                            </div>
+                          </div>
+                          {run.status === "completed" && run.videoUrl ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-amber-300/30 px-2 text-[10px] text-amber-100"
+                              onClick={() => openHistoricalRun(run)}
+                            >
+                              打开放映
+                            </Button>
+                          ) : run.status === "failed" && retryableFailedStage(run) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-red-300/30 px-2 text-[10px] text-red-100"
+                              disabled={historyRetryId != null}
+                              onClick={() => void retryHistoricalRun(run)}
+                            >
+                              {historyRetryId === run.id ? "重试中…" : "重试媒体阶段"}
+                            </Button>
+                          ) : null}
                         </div>
-                        {run.status === "completed" && run.videoUrl ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 border-amber-300/30 px-2 text-[10px] text-amber-100"
-                            onClick={() => openHistoricalRun(run)}
-                          >
-                            打开放映
-                          </Button>
-                        ) : run.status === "failed" && retryableFailedStage(run) ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 border-red-300/30 px-2 text-[10px] text-red-100"
-                            disabled={historyRetryId != null}
-                            onClick={() => void retryHistoricalRun(run)}
-                          >
-                            {historyRetryId === run.id ? "重试中…" : "重试媒体阶段"}
-                          </Button>
-                        ) : null}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

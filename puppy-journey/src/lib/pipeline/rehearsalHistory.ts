@@ -1,4 +1,10 @@
-import type { LessonScript, PipelineJobStatus, RehearsalRunState } from "@/lib/pipeline/types";
+import {
+  REHEARSAL_STAGES,
+  type LessonScript,
+  type PipelineJobStatus,
+  type RehearsalRunState,
+  type RehearsalStage,
+} from "./types";
 
 export type RehearsalHistoryRun = {
   id: string;
@@ -14,6 +20,22 @@ export type RehearsalHistoryRun = {
 };
 
 export type RetryableRehearsalStage = "image" | "video";
+
+export type RehearsalProgressSummary = {
+  completedStages: number;
+  totalStages: number;
+  percent: number;
+  label: string;
+  activeStage: RehearsalStage | null;
+};
+
+const STAGE_LABELS: Record<RehearsalStage, string> = {
+  context: "整理上下文",
+  script: "生成剧本",
+  image: "生成关键帧",
+  video: "生成视频",
+  learning: "准备学习卡片",
+};
 
 const STATUSES = new Set<PipelineJobStatus>(["queued", "processing", "completed", "failed"]);
 
@@ -72,4 +94,46 @@ export function retryableFailedStage(
     return "image";
   }
   return null;
+}
+
+export function summarizeRehearsalProgress(
+  run: RehearsalHistoryRun,
+): RehearsalProgressSummary {
+  const totalStages = REHEARSAL_STAGES.length;
+  const stages = run.runState?.stages;
+  if (!stages) {
+    const completed = run.status === "completed" ? totalStages : 0;
+    return {
+      completedStages: completed,
+      totalStages,
+      percent: completed === totalStages ? 100 : 0,
+      label: run.status === "completed" ? "全部完成" : run.status === "failed" ? "运行失败" : "等待开始",
+      activeStage: null,
+    };
+  }
+
+  const completedStages = REHEARSAL_STAGES.filter(
+    (stage) => stages[stage]?.status === "completed",
+  ).length;
+  const activeStage = REHEARSAL_STAGES.find(
+    (stage) => stages[stage]?.status === "failed",
+  ) ?? REHEARSAL_STAGES.find(
+    (stage) => stages[stage]?.status === "running",
+  ) ?? REHEARSAL_STAGES.find(
+    (stage) => stages[stage]?.status === "ready",
+  ) ?? null;
+  const activeStatus = activeStage ? stages[activeStage]?.status : undefined;
+  const label = completedStages === totalStages
+    ? "全部完成"
+    : activeStage
+      ? `${STAGE_LABELS[activeStage]}${activeStatus === "failed" ? "失败" : activeStatus === "running" ? "中" : "待开始"}`
+      : "等待开始";
+
+  return {
+    completedStages,
+    totalStages,
+    percent: Math.round((completedStages / totalStages) * 100),
+    label,
+    activeStage,
+  };
 }
