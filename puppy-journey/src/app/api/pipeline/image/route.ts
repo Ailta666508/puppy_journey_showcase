@@ -4,6 +4,8 @@ import { requireCoupleWorkspaceContext } from "@/lib/couple/coupleWorkspaceConte
 import {
   beginImageStage,
   completeImageStage,
+  isStaleImageStage,
+  resumeStaleImageStage,
 } from "@/lib/pipeline/rehearsalImageRun.server";
 import { generateLessonKeyVisual } from "@/lib/pipeline/service";
 import type { LessonScript, RehearsalRunState } from "@/lib/pipeline/types";
@@ -78,7 +80,9 @@ export async function POST(req: Request) {
     const startedAt = new Date().toISOString();
     let runningRun: RehearsalRunState;
     try {
-      runningRun = beginImageStage(previousRun, startedAt);
+      runningRun = isStaleImageStage(previousRun, startedAt)
+        ? resumeStaleImageStage(previousRun, startedAt)
+        : beginImageStage(previousRun, startedAt);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return NextResponse.json({ ok: false, error: message }, { status: 409 });

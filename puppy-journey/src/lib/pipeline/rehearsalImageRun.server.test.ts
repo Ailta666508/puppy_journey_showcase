@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { beginImageStage, completeImageStage } from "./rehearsalImageRun.server";
+import {
+  beginImageStage,
+  completeImageStage,
+  isStaleImageStage,
+  resumeStaleImageStage,
+} from "./rehearsalImageRun.server";
 import {
   completeRehearsalStage,
   createRehearsalRunState,
@@ -55,5 +60,29 @@ describe("rehearsal image run", () => {
     expect(() => beginImageStage(completed, "2026-09-12T09:00:07.000Z")).toThrow(
       "Cannot begin image from completed",
     );
+  });
+
+  it("recovers an image stage left running by an interrupted request", () => {
+    const running = beginImageStage(imageReadyRun(), "2026-09-12T09:00:05.000Z");
+    expect(isStaleImageStage(running, "2026-09-12T09:02:04.999Z")).toBe(false);
+    expect(isStaleImageStage(running, "2026-09-12T09:02:05.000Z")).toBe(true);
+
+    const recovered = resumeStaleImageStage(
+      running,
+      "2026-09-12T09:02:05.000Z",
+    );
+    expect(recovered.stages.script.status).toBe("completed");
+    expect(recovered.stages.image).toMatchObject({
+      status: "running",
+      attempt: 2,
+      startedAt: "2026-09-12T09:02:05.000Z",
+    });
+  });
+
+  it("does not recover a recent image request", () => {
+    const running = beginImageStage(imageReadyRun(), "2026-09-12T09:00:05.000Z");
+    expect(() =>
+      resumeStaleImageStage(running, "2026-09-12T09:02:04.999Z"),
+    ).toThrow("image stage is not stale enough");
   });
 });
