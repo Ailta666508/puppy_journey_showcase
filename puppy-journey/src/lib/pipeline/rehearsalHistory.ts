@@ -96,6 +96,14 @@ export function retryableFailedStage(
   return null;
 }
 
+export function canResumeVideoPolling(run: RehearsalHistoryRun): boolean {
+  return (
+    run.status === "processing" &&
+    run.runState?.stages?.video?.status === "running" &&
+    run.script !== null
+  );
+}
+
 export function summarizeRehearsalProgress(
   run: RehearsalHistoryRun,
 ): RehearsalProgressSummary {

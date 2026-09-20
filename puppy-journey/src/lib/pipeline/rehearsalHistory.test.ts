@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canResumeVideoPolling,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
   summarizeRehearsalProgress,
@@ -120,6 +121,28 @@ describe("parseRehearsalHistoryResponse", () => {
       label: "生成关键帧失败",
       activeStage: "image",
     });
+  });
+
+  it("offers polling recovery only for an in-flight video with a saved script", () => {
+    const run = {
+      id: "run-6",
+      status: "processing",
+      userText: "练习旅行对话",
+      script: SCRIPT,
+      runState: {
+        schemaVersion: 1,
+        stages: { video: { status: "running", attempt: 1 } },
+      },
+      keyImageUrl: "https://example.com/frame.png",
+      videoUrl: null,
+      thumbnailUrl: null,
+      error: null,
+      updatedAt: "",
+    } as unknown as RehearsalHistoryRun;
+
+    expect(canResumeVideoPolling(run)).toBe(true);
+    expect(canResumeVideoPolling({ ...run, status: "failed" })).toBe(false);
+    expect(canResumeVideoPolling({ ...run, script: null })).toBe(false);
   });
 
   it("falls back to the terminal job status when legacy history has no stage state", () => {

@@ -19,6 +19,7 @@ import {
   type RehearsalScriptRequestBody,
 } from "@/lib/pipeline/rehearsalClientRun";
 import {
+  canResumeVideoPolling,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
   summarizeRehearsalProgress,
@@ -516,6 +517,52 @@ export function RehearsalTheaterView() {
     }
   }, [refreshRehearsalHistory, waitForVideo]);
 
+  const resumeHistoricalVideo = useCallback(async (run: RehearsalHistoryRun) => {
+    if (!canResumeVideoPolling(run) || !run.script) {
+      setPipelineError("这条历史记录没有可继续等待的视频任务");
+      return;
+    }
+    setHistoryRetryId(run.id);
+    setPipelineLoading(true);
+    setPipelineError(null);
+    setScript(run.script);
+    setKeyImageUrl(run.keyImageUrl ?? run.thumbnailUrl);
+    try {
+      const apiHeaders = await supabaseBearerHeaders();
+      setPipelineStep("恢复视频任务并继续等待…");
+      const response = await fetch("/api/pipeline/video/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...apiHeaders },
+        body: JSON.stringify({ pipeline_job_id: run.id }),
+      });
+      const payload = await response.json() as {
+        ok?: boolean;
+        error?: unknown;
+        jobId?: string;
+        status?: string;
+        videoUrl?: string;
+      };
+      if (!response.ok || !payload.ok || !payload.jobId) {
+        throw new Error(getApiErrorField(payload.error, "恢复视频任务失败"));
+      }
+      const finalUrl = await waitForVideo(
+        payload.jobId,
+        apiHeaders,
+        payload.status === "completed" ? payload.videoUrl : undefined,
+      );
+      setVideoUrl(finalUrl);
+      setPhase("cinema");
+      await refreshRehearsalHistory();
+    } catch (error) {
+      setPipelineError(getErrorMessage(error));
+      await refreshRehearsalHistory();
+    } finally {
+      setHistoryRetryId(null);
+      setPipelineLoading(false);
+      setPipelineStep("");
+    }
+  }, [refreshRehearsalHistory, waitForVideo]);
+
   const vocabCards =
     script?.script?.map((line, i) => ({
       es: line.text,
@@ -706,6 +753,17 @@ export function RehearsalTheaterView() {
                               onClick={() => openHistoricalRun(run)}
                             >
                               打开放映
+                            </Button>
+                          ) : canResumeVideoPolling(run) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-amber-300/30 px-2 text-[10px] text-amber-100"
+                              disabled={historyRetryId != null}
+                              onClick={() => void resumeHistoricalVideo(run)}
+                            >
+                              {historyRetryId === run.id ? "恢复中…" : "继续等待"}
                             </Button>
                           ) : run.status === "failed" && retryableFailedStage(run) ? (
                             <Button
