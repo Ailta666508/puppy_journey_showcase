@@ -38,6 +38,7 @@ const STAGE_LABELS: Record<RehearsalStage, string> = {
 };
 
 const STATUSES = new Set<PipelineJobStatus>(["queued", "processing", "completed", "failed"]);
+export const REHEARSAL_IMAGE_RECOVERY_AFTER_MS = 2 * 60 * 1000;
 
 function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -102,6 +103,28 @@ export function canResumeVideoPolling(run: RehearsalHistoryRun): boolean {
     run.runState?.stages?.video?.status === "running" &&
     run.script !== null
   );
+}
+
+export function canRecoverInterruptedImage(
+  run: RehearsalHistoryRun,
+  nowMs = Date.now(),
+  staleAfterMs = REHEARSAL_IMAGE_RECOVERY_AFTER_MS,
+): boolean {
+  const image = run.runState?.stages?.image;
+  if (
+    run.status !== "processing" ||
+    image?.status !== "running" ||
+    run.script === null ||
+    !Number.isFinite(staleAfterMs) ||
+    staleAfterMs <= 0
+  ) {
+    return false;
+  }
+  const activityMs = Math.max(
+    Date.parse(image.startedAt ?? ""),
+    Date.parse(run.updatedAt),
+  );
+  return Number.isFinite(activityMs) && nowMs - activityMs >= staleAfterMs;
 }
 
 export function summarizeRehearsalProgress(

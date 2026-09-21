@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canRecoverInterruptedImage,
   canResumeVideoPolling,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
@@ -143,6 +144,34 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(canResumeVideoPolling(run)).toBe(true);
     expect(canResumeVideoPolling({ ...run, status: "failed" })).toBe(false);
     expect(canResumeVideoPolling({ ...run, script: null })).toBe(false);
+  });
+
+  it("offers image recovery only after an interrupted claim becomes stale", () => {
+    const run = {
+      id: "run-7",
+      status: "processing",
+      userText: "练习旅行对话",
+      script: SCRIPT,
+      runState: {
+        schemaVersion: 1,
+        stages: {
+          image: {
+            status: "running",
+            attempt: 1,
+            startedAt: "2026-09-21T08:00:00.000Z",
+          },
+        },
+      },
+      keyImageUrl: null,
+      videoUrl: null,
+      thumbnailUrl: null,
+      error: null,
+      updatedAt: "2026-09-21T08:00:00.000Z",
+    } as unknown as RehearsalHistoryRun;
+
+    expect(canRecoverInterruptedImage(run, Date.parse("2026-09-21T08:01:59.999Z"))).toBe(false);
+    expect(canRecoverInterruptedImage(run, Date.parse("2026-09-21T08:02:00.000Z"))).toBe(true);
+    expect(canRecoverInterruptedImage({ ...run, script: null }, Date.parse("2026-09-21T09:00:00Z"))).toBe(false);
   });
 
   it("falls back to the terminal job status when legacy history has no stage state", () => {

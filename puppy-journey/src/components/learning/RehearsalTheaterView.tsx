@@ -19,6 +19,7 @@ import {
   type RehearsalScriptRequestBody,
 } from "@/lib/pipeline/rehearsalClientRun";
 import {
+  canRecoverInterruptedImage,
   canResumeVideoPolling,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
@@ -453,7 +454,9 @@ export function RehearsalTheaterView() {
 
   const retryHistoricalRun = useCallback(async (run: RehearsalHistoryRun) => {
     const failedStage = retryableFailedStage(run);
-    if (!failedStage || !run.script) {
+    const recoveringInterruptedImage = canRecoverInterruptedImage(run);
+    const resumableStage = failedStage ?? (recoveringInterruptedImage ? "image" : null);
+    if (!resumableStage || !run.script) {
       setPipelineError("这条历史记录无法从媒体阶段恢复，请重新开始排练");
       return;
     }
@@ -464,8 +467,8 @@ export function RehearsalTheaterView() {
     try {
       const apiHeaders = await supabaseBearerHeaders();
       let imageUrl = run.keyImageUrl;
-      if (failedStage === "image") {
-        setPipelineStep("重试关键帧生成…");
+      if (resumableStage === "image") {
+        setPipelineStep(recoveringInterruptedImage ? "恢复中断的关键帧生成…" : "重试关键帧生成…");
         const imageResponse = await fetch("/api/pipeline/image", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...apiHeaders },
@@ -764,6 +767,17 @@ export function RehearsalTheaterView() {
                               onClick={() => void resumeHistoricalVideo(run)}
                             >
                               {historyRetryId === run.id ? "恢复中…" : "继续等待"}
+                            </Button>
+                          ) : canRecoverInterruptedImage(run) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-amber-300/30 px-2 text-[10px] text-amber-100"
+                              disabled={historyRetryId != null}
+                              onClick={() => void retryHistoricalRun(run)}
+                            >
+                              {historyRetryId === run.id ? "恢复中…" : "恢复关键帧"}
                             </Button>
                           ) : run.status === "failed" && retryableFailedStage(run) ? (
                             <Button
