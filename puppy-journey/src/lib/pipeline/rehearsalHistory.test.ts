@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canRecoverInterruptedImage,
   canResumeVideoPolling,
+  msUntilInterruptedImageRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
   summarizeRehearsalProgress,
@@ -172,6 +173,27 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(canRecoverInterruptedImage(run, Date.parse("2026-09-21T08:01:59.999Z"))).toBe(false);
     expect(canRecoverInterruptedImage(run, Date.parse("2026-09-21T08:02:00.000Z"))).toBe(true);
     expect(canRecoverInterruptedImage({ ...run, script: null }, Date.parse("2026-09-21T09:00:00Z"))).toBe(false);
+  });
+
+  it("returns a timer delay for the recovery boundary", () => {
+    const run = {
+      id: "run-8",
+      status: "processing",
+      userText: "练习旅行对话",
+      script: SCRIPT,
+      runState: {
+        schemaVersion: 1,
+        stages: { image: { status: "running", attempt: 1, startedAt: "2026-09-21T08:00:00.000Z" } },
+      },
+      keyImageUrl: null,
+      videoUrl: null,
+      thumbnailUrl: null,
+      error: null,
+      updatedAt: "2026-09-21T08:00:00.000Z",
+    } as unknown as RehearsalHistoryRun;
+
+    expect(msUntilInterruptedImageRecovery(run, Date.parse("2026-09-21T08:01:30.000Z"))).toBe(30_000);
+    expect(msUntilInterruptedImageRecovery(run, Date.parse("2026-09-21T08:02:00.000Z"))).toBeNull();
   });
 
   it("falls back to the terminal job status when legacy history has no stage state", () => {

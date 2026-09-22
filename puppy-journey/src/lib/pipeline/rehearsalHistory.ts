@@ -127,6 +127,30 @@ export function canRecoverInterruptedImage(
   return Number.isFinite(activityMs) && nowMs - activityMs >= staleAfterMs;
 }
 
+export function msUntilInterruptedImageRecovery(
+  run: RehearsalHistoryRun,
+  nowMs = Date.now(),
+  staleAfterMs = REHEARSAL_IMAGE_RECOVERY_AFTER_MS,
+): number | null {
+  const image = run.runState?.stages?.image;
+  if (
+    run.status !== "processing" ||
+    image?.status !== "running" ||
+    run.script === null ||
+    !Number.isFinite(staleAfterMs) ||
+    staleAfterMs <= 0
+  ) {
+    return null;
+  }
+  const activityMs = Math.max(
+    Date.parse(image.startedAt ?? ""),
+    Date.parse(run.updatedAt),
+  );
+  if (!Number.isFinite(activityMs)) return null;
+  const remainingMs = activityMs + staleAfterMs - nowMs;
+  return remainingMs > 0 ? remainingMs : null;
+}
+
 export function summarizeRehearsalProgress(
   run: RehearsalHistoryRun,
 ): RehearsalProgressSummary {

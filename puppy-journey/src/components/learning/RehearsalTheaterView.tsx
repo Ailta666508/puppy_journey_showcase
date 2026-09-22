@@ -21,6 +21,7 @@ import {
 import {
   canRecoverInterruptedImage,
   canResumeVideoPolling,
+  msUntilInterruptedImageRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
   summarizeRehearsalProgress,
@@ -96,6 +97,7 @@ export function RehearsalTheaterView() {
   const [keyImageUrl, setKeyImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [rehearsalHistory, setRehearsalHistory] = useState<RehearsalHistoryRun[]>([]);
+  const [historyNowMs, setHistoryNowMs] = useState(() => Date.now());
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRetryId, setHistoryRetryId] = useState<string | null>(null);
@@ -125,6 +127,18 @@ export function RehearsalTheaterView() {
   useEffect(() => {
     void refreshRehearsalHistory();
   }, [refreshRehearsalHistory]);
+
+  useEffect(() => {
+    const delays = rehearsalHistory
+      .map((run) => msUntilInterruptedImageRecovery(run, historyNowMs))
+      .filter((delay): delay is number => delay !== null);
+    if (delays.length === 0) return;
+    const timer = window.setTimeout(
+      () => setHistoryNowMs(Date.now()),
+      Math.min(...delays) + 50,
+    );
+    return () => window.clearTimeout(timer);
+  }, [historyNowMs, rehearsalHistory]);
 
   useEffect(() => {
     let cancelled = false;
@@ -454,7 +468,7 @@ export function RehearsalTheaterView() {
 
   const retryHistoricalRun = useCallback(async (run: RehearsalHistoryRun) => {
     const failedStage = retryableFailedStage(run);
-    const recoveringInterruptedImage = canRecoverInterruptedImage(run);
+    const recoveringInterruptedImage = canRecoverInterruptedImage(run, historyNowMs);
     const resumableStage = failedStage ?? (recoveringInterruptedImage ? "image" : null);
     if (!resumableStage || !run.script) {
       setPipelineError("这条历史记录无法从媒体阶段恢复，请重新开始排练");
@@ -518,7 +532,7 @@ export function RehearsalTheaterView() {
       setPipelineLoading(false);
       setPipelineStep("");
     }
-  }, [refreshRehearsalHistory, waitForVideo]);
+  }, [historyNowMs, refreshRehearsalHistory, waitForVideo]);
 
   const resumeHistoricalVideo = useCallback(async (run: RehearsalHistoryRun) => {
     if (!canResumeVideoPolling(run) || !run.script) {
@@ -768,7 +782,7 @@ export function RehearsalTheaterView() {
                             >
                               {historyRetryId === run.id ? "恢复中…" : "继续等待"}
                             </Button>
-                          ) : canRecoverInterruptedImage(run) ? (
+                          ) : canRecoverInterruptedImage(run, historyNowMs) ? (
                             <Button
                               type="button"
                               size="sm"
