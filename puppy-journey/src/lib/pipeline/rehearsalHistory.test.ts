@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canRecoverInterruptedImage,
   canResumeVideoPolling,
+  hasActiveRehearsalRuns,
   msUntilInterruptedImageRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
@@ -63,6 +64,17 @@ describe("parseRehearsalHistoryResponse", () => {
 
   it("rejects a response without a run collection", () => {
     expect(() => parseRehearsalHistoryResponse({ ok: true })).toThrow("缺少 runs");
+  });
+
+  it("detects history that still needs background refresh", () => {
+    const run = (status: RehearsalHistoryRun["status"]) => ({
+      id: status,
+      status,
+    }) as RehearsalHistoryRun;
+
+    expect(hasActiveRehearsalRuns([run("completed"), run("failed")])).toBe(false);
+    expect(hasActiveRehearsalRuns([run("completed"), run("queued")])).toBe(true);
+    expect(hasActiveRehearsalRuns([run("processing")])).toBe(true);
   });
 
   it.each([

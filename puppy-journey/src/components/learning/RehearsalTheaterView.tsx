@@ -21,6 +21,7 @@ import {
 import {
   canRecoverInterruptedImage,
   canResumeVideoPolling,
+  hasActiveRehearsalRuns,
   msUntilInterruptedImageRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
@@ -71,6 +72,7 @@ const DEMO_VOCAB_CARDS = [
 /** 图生视频常需数分钟；总等待约 10 分钟 */
 const POLL_INTERVAL_MS = 2_000;
 const POLL_MAX_ATTEMPTS = 300;
+const HISTORY_REFRESH_MS = 15_000;
 
 export function RehearsalTheaterView() {
   const userId = useAppStore((s: AppState) => s.currentUserRole);
@@ -127,6 +129,15 @@ export function RehearsalTheaterView() {
   useEffect(() => {
     void refreshRehearsalHistory();
   }, [refreshRehearsalHistory]);
+
+  useEffect(() => {
+    if (historyLoading || !hasActiveRehearsalRuns(rehearsalHistory)) return;
+    const timer = window.setTimeout(
+      () => void refreshRehearsalHistory(),
+      HISTORY_REFRESH_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [historyLoading, rehearsalHistory, refreshRehearsalHistory]);
 
   useEffect(() => {
     const delays = rehearsalHistory

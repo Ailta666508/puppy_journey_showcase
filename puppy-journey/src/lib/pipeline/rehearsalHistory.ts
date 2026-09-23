@@ -83,6 +83,10 @@ export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryR
   });
 }
 
+export function hasActiveRehearsalRuns(runs: RehearsalHistoryRun[]): boolean {
+  return runs.some((run) => run.status === "queued" || run.status === "processing");
+}
+
 export function retryableFailedStage(
   run: RehearsalHistoryRun,
 ): RetryableRehearsalStage | null {
