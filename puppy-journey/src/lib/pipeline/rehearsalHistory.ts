@@ -29,6 +29,13 @@ export type RehearsalProgressSummary = {
   activeStage: RehearsalStage | null;
 };
 
+export type RehearsalFailureSummary = {
+  stage: RehearsalStage | null;
+  label: string;
+  attempt: number | null;
+  message: string;
+};
+
 const STAGE_LABELS: Record<RehearsalStage, string> = {
   context: "整理上下文",
   script: "生成剧本",
@@ -194,5 +201,23 @@ export function summarizeRehearsalProgress(
     percent: Math.round((completedStages / totalStages) * 100),
     label,
     activeStage,
+  };
+}
+
+export function summarizeRehearsalFailure(
+  run: RehearsalHistoryRun,
+): RehearsalFailureSummary | null {
+  if (run.status !== "failed") return null;
+
+  const failedStage = REHEARSAL_STAGES.find(
+    (stage) => run.runState?.stages?.[stage]?.status === "failed",
+  ) ?? null;
+  const stageState = failedStage ? run.runState?.stages?.[failedStage] : undefined;
+  const message = optionalString(stageState?.error) ?? run.error ?? "未提供失败原因";
+  return {
+    stage: failedStage,
+    label: failedStage ? STAGE_LABELS[failedStage] : "运行",
+    attempt: stageState?.attempt ?? null,
+    message,
   };
 }

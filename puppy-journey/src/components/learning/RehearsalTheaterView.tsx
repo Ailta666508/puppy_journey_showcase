@@ -25,6 +25,7 @@ import {
   msUntilInterruptedImageRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
+  summarizeRehearsalFailure,
   summarizeRehearsalProgress,
   type RehearsalHistoryRun,
 } from "@/lib/pipeline/rehearsalHistory";
@@ -754,6 +755,7 @@ export function RehearsalTheaterView() {
                   <div className="space-y-1.5">
                     {rehearsalHistory.slice(0, 4).map((run) => {
                       const progress = summarizeRehearsalProgress(run);
+                      const failure = summarizeRehearsalFailure(run);
                       return (
                         <div key={run.id} className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-2">
                           <div className="min-w-0 flex-1 space-y-1">
@@ -771,6 +773,19 @@ export function RehearsalTheaterView() {
                                 style={{ width: `${progress.percent}%` }}
                               />
                             </div>
+                            {failure ? (
+                              <p
+                                role="alert"
+                                title={failure.message}
+                                className="truncate text-[10px] text-red-200/75"
+                              >
+                                {failure.label}
+                                {failure.attempt && failure.attempt > 1
+                                  ? ` · 第 ${failure.attempt} 次尝试`
+                                  : ""}
+                                {` · ${failure.message}`}
+                              </p>
+                            ) : null}
                           </div>
                           {run.status === "completed" && run.videoUrl ? (
                             <Button

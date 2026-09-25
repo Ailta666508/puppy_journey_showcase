@@ -7,6 +7,7 @@ import {
   msUntilInterruptedImageRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
+  summarizeRehearsalFailure,
   summarizeRehearsalProgress,
   type RehearsalHistoryRun,
 } from "./rehearsalHistory";
@@ -135,6 +136,31 @@ describe("parseRehearsalHistoryResponse", () => {
       label: "生成关键帧失败",
       activeStage: "image",
     });
+    expect(summarizeRehearsalFailure(run)).toEqual({
+      stage: "image",
+      label: "生成关键帧",
+      attempt: 2,
+      message: "provider timeout",
+    });
+  });
+
+  it("falls back to the persisted job error for legacy failed runs", () => {
+    const run = parseRehearsalHistoryResponse({
+      runs: [{
+        id: "legacy-failure",
+        status: "failed",
+        error: "legacy provider timeout",
+        updatedAt: "2026-09-23T08:00:00.000Z",
+      }],
+    })[0]!;
+
+    expect(summarizeRehearsalFailure(run)).toEqual({
+      stage: null,
+      label: "运行",
+      attempt: null,
+      message: "legacy provider timeout",
+    });
+    expect(summarizeRehearsalFailure({ ...run, status: "completed" })).toBeNull();
   });
 
   it("offers polling recovery only for an in-flight video with a saved script", () => {
