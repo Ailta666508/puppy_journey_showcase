@@ -15,6 +15,7 @@ export type RehearsalHistoryRun = {
   keyImageUrl: string | null;
   videoUrl: string | null;
   thumbnailUrl: string | null;
+  providerTaskId: string | null;
   error: string | null;
   updatedAt: string;
 };
@@ -46,6 +47,7 @@ const STAGE_LABELS: Record<RehearsalStage, string> = {
 
 const STATUSES = new Set<PipelineJobStatus>(["queued", "processing", "completed", "failed"]);
 export const REHEARSAL_IMAGE_RECOVERY_AFTER_MS = 2 * 60 * 1000;
+export const REHEARSAL_VIDEO_RECOVERY_AFTER_MS = 2 * 60 * 1000;
 
 function optionalString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
@@ -84,6 +86,7 @@ export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryR
       keyImageUrl: optionalString(row.keyImageUrl),
       videoUrl: optionalString(row.videoUrl),
       thumbnailUrl: optionalString(row.thumbnailUrl),
+      providerTaskId: optionalString(row.providerTaskId),
       error: optionalString(row.error),
       updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : "",
     }];
@@ -112,8 +115,62 @@ export function canResumeVideoPolling(run: RehearsalHistoryRun): boolean {
   return (
     run.status === "processing" &&
     run.runState?.stages?.video?.status === "running" &&
-    run.script !== null
+    run.script !== null &&
+    run.providerTaskId !== null
   );
+}
+
+export function canRecoverInterruptedVideoSubmission(
+  run: RehearsalHistoryRun,
+  nowMs = Date.now(),
+  staleAfterMs = REHEARSAL_VIDEO_RECOVERY_AFTER_MS,
+): boolean {
+  const video = run.runState?.stages?.video;
+  if (
+    run.status !== "processing" ||
+    video?.status !== "running" ||
+    run.runState?.stages?.image?.status !== "completed" ||
+    run.script === null ||
+    run.keyImageUrl === null ||
+    run.providerTaskId !== null ||
+    !Number.isFinite(staleAfterMs) ||
+    staleAfterMs <= 0
+  ) {
+    return false;
+  }
+  const activityMs = Math.max(
+    Date.parse(video.startedAt ?? ""),
+    Date.parse(run.updatedAt),
+  );
+  return Number.isFinite(activityMs) && nowMs - activityMs >= staleAfterMs;
+}
+
+export function msUntilInterruptedVideoRecovery(
+  run: RehearsalHistoryRun,
+  nowMs = Date.now(),
+  staleAfterMs = REHEARSAL_VIDEO_RECOVERY_AFTER_MS,
+): number | null {
+  if (canRecoverInterruptedVideoSubmission(run, nowMs, staleAfterMs)) return null;
+  const video = run.runState?.stages?.video;
+  if (
+    run.status !== "processing" ||
+    video?.status !== "running" ||
+    run.runState?.stages?.image?.status !== "completed" ||
+    run.script === null ||
+    run.keyImageUrl === null ||
+    run.providerTaskId !== null ||
+    !Number.isFinite(staleAfterMs) ||
+    staleAfterMs <= 0
+  ) {
+    return null;
+  }
+  const activityMs = Math.max(
+    Date.parse(video.startedAt ?? ""),
+    Date.parse(run.updatedAt),
+  );
+  if (!Number.isFinite(activityMs)) return null;
+  const remainingMs = activityMs + staleAfterMs - nowMs;
+  return remainingMs > 0 ? remainingMs : null;
 }
 
 export function canRecoverInterruptedImage(

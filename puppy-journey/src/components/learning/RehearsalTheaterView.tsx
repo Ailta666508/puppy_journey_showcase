@@ -20,9 +20,11 @@ import {
 } from "@/lib/pipeline/rehearsalClientRun";
 import {
   canRecoverInterruptedImage,
+  canRecoverInterruptedVideoSubmission,
   canResumeVideoPolling,
   hasActiveRehearsalRuns,
   msUntilInterruptedImageRecovery,
+  msUntilInterruptedVideoRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
   summarizeRehearsalFailure,
@@ -120,6 +122,7 @@ export function RehearsalTheaterView() {
       const payload = await response.json() as unknown;
       if (!response.ok) throw new Error(`排练历史请求失败 ${response.status}`);
       setRehearsalHistory(parseRehearsalHistoryResponse(payload));
+      setHistoryNowMs(Date.now());
     } catch (error) {
       setHistoryError(getErrorMessage(error));
     } finally {
@@ -142,7 +145,10 @@ export function RehearsalTheaterView() {
 
   useEffect(() => {
     const delays = rehearsalHistory
-      .map((run) => msUntilInterruptedImageRecovery(run, historyNowMs))
+      .flatMap((run) => [
+        msUntilInterruptedImageRecovery(run, historyNowMs),
+        msUntilInterruptedVideoRecovery(run, historyNowMs),
+      ])
       .filter((delay): delay is number => delay !== null);
     if (delays.length === 0) return;
     const timer = window.setTimeout(
@@ -547,7 +553,8 @@ export function RehearsalTheaterView() {
   }, [historyNowMs, refreshRehearsalHistory, waitForVideo]);
 
   const resumeHistoricalVideo = useCallback(async (run: RehearsalHistoryRun) => {
-    if (!canResumeVideoPolling(run) || !run.script) {
+    const recoveringSubmission = canRecoverInterruptedVideoSubmission(run, historyNowMs);
+    if ((!canResumeVideoPolling(run) && !recoveringSubmission) || !run.script) {
       setPipelineError("这条历史记录没有可继续等待的视频任务");
       return;
     }
@@ -558,7 +565,9 @@ export function RehearsalTheaterView() {
     setKeyImageUrl(run.keyImageUrl ?? run.thumbnailUrl);
     try {
       const apiHeaders = await supabaseBearerHeaders();
-      setPipelineStep("恢复视频任务并继续等待…");
+      setPipelineStep(
+        recoveringSubmission ? "重新提交中断的视频任务…" : "恢复视频任务并继续等待…",
+      );
       const response = await fetch("/api/pipeline/video/start", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...apiHeaders },
@@ -590,7 +599,7 @@ export function RehearsalTheaterView() {
       setPipelineLoading(false);
       setPipelineStep("");
     }
-  }, [refreshRehearsalHistory, waitForVideo]);
+  }, [historyNowMs, refreshRehearsalHistory, waitForVideo]);
 
   const vocabCards =
     script?.script?.map((line, i) => ({
@@ -807,6 +816,17 @@ export function RehearsalTheaterView() {
                               onClick={() => void resumeHistoricalVideo(run)}
                             >
                               {historyRetryId === run.id ? "恢复中…" : "继续等待"}
+                            </Button>
+                          ) : canRecoverInterruptedVideoSubmission(run, historyNowMs) ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              className="h-7 border-amber-300/30 px-2 text-[10px] text-amber-100"
+                              disabled={historyRetryId != null}
+                              onClick={() => void resumeHistoricalVideo(run)}
+                            >
+                              {historyRetryId === run.id ? "恢复中…" : "重新提交视频"}
                             </Button>
                           ) : canRecoverInterruptedImage(run, historyNowMs) ? (
                             <Button

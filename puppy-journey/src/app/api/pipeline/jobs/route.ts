@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const { data, error } = await supabase
       .from("rehearsal_pipeline_jobs")
       .select(
-        "id, author_id, couple_id, status, user_text, script_json, run_state, key_image_url, video_url, thumbnail_url, error_message, created_at, updated_at",
+        "id, author_id, couple_id, status, user_text, script_json, run_state, key_image_url, video_url, thumbnail_url, provider_task_id, error_message, created_at, updated_at",
       )
       .eq("couple_id", coupleId)
       .order("updated_at", { ascending: false })
@@ -35,6 +35,7 @@ export async function GET(req: Request) {
         keyImageUrl: row.key_image_url,
         videoUrl: row.video_url,
         thumbnailUrl: row.thumbnail_url,
+        providerTaskId: row.provider_task_id,
         error: row.error_message,
         createdAt: row.created_at,
         updatedAt: row.updated_at,

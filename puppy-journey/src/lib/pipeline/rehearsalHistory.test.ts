@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canRecoverInterruptedVideoSubmission,
   canRecoverInterruptedImage,
   canResumeVideoPolling,
   hasActiveRehearsalRuns,
   msUntilInterruptedImageRecovery,
+  msUntilInterruptedVideoRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
   summarizeRehearsalFailure,
@@ -30,6 +32,7 @@ describe("parseRehearsalHistoryResponse", () => {
         runState: { schemaVersion: 1 },
         keyImageUrl: "https://example.com/frame.png",
         videoUrl: "https://example.com/movie.mp4",
+        providerTaskId: "provider-1",
         thumbnailUrl: null,
         error: null,
         updatedAt: "2026-09-16T08:00:00Z",
@@ -42,6 +45,7 @@ describe("parseRehearsalHistoryResponse", () => {
       status: "completed",
       userText: "去看雪山",
       videoUrl: "https://example.com/movie.mp4",
+      providerTaskId: "provider-1",
       script: SCRIPT,
     });
   });
@@ -176,6 +180,7 @@ describe("parseRehearsalHistoryResponse", () => {
       keyImageUrl: "https://example.com/frame.png",
       videoUrl: null,
       thumbnailUrl: null,
+      providerTaskId: "provider-6",
       error: null,
       updatedAt: "",
     } as unknown as RehearsalHistoryRun;
@@ -183,6 +188,67 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(canResumeVideoPolling(run)).toBe(true);
     expect(canResumeVideoPolling({ ...run, status: "failed" })).toBe(false);
     expect(canResumeVideoPolling({ ...run, script: null })).toBe(false);
+    expect(canResumeVideoPolling({ ...run, providerTaskId: null })).toBe(false);
+  });
+
+  it("recovers a stale video claim only when provider submission was interrupted", () => {
+    const run = {
+      id: "run-video-recovery",
+      status: "processing",
+      userText: "练习旅行对话",
+      script: SCRIPT,
+      runState: {
+        schemaVersion: 1,
+        stages: {
+          image: { status: "completed", attempt: 1 },
+          video: {
+            status: "running",
+            attempt: 1,
+            startedAt: "2026-09-26T08:00:00.000Z",
+          },
+        },
+      },
+      keyImageUrl: "https://example.com/frame.png",
+      videoUrl: null,
+      thumbnailUrl: null,
+      providerTaskId: null,
+      error: null,
+      updatedAt: "2026-09-26T08:00:00.000Z",
+    } as unknown as RehearsalHistoryRun;
+
+    expect(
+      canRecoverInterruptedVideoSubmission(run, Date.parse("2026-09-26T08:01:59.999Z")),
+    ).toBe(false);
+    expect(
+      canRecoverInterruptedVideoSubmission(run, Date.parse("2026-09-26T08:02:00.000Z")),
+    ).toBe(true);
+    expect(
+      canRecoverInterruptedVideoSubmission(
+        { ...run, providerTaskId: "provider-1" },
+        Date.parse("2026-09-26T09:00:00.000Z"),
+      ),
+    ).toBe(false);
+  });
+
+  it("returns the video submission recovery boundary delay", () => {
+    const run = {
+      id: "run-video-timer",
+      status: "processing",
+      script: SCRIPT,
+      runState: {
+        schemaVersion: 1,
+        stages: {
+          image: { status: "completed", attempt: 1 },
+          video: { status: "running", attempt: 1, startedAt: "2026-09-26T08:00:00.000Z" },
+        },
+      },
+      keyImageUrl: "https://example.com/frame.png",
+      providerTaskId: null,
+      updatedAt: "2026-09-26T08:00:00.000Z",
+    } as unknown as RehearsalHistoryRun;
+
+    expect(msUntilInterruptedVideoRecovery(run, Date.parse("2026-09-26T08:01:30.000Z"))).toBe(30_000);
+    expect(msUntilInterruptedVideoRecovery(run, Date.parse("2026-09-26T08:02:00.000Z"))).toBeNull();
   });
 
   it("offers image recovery only after an interrupted claim becomes stale", () => {
