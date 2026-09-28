@@ -29,3 +29,41 @@ export function asFailedRehearsalScriptRetry(
 ): RehearsalScriptRequestBody {
   return { ...request, retry_failed: true };
 }
+
+export type RehearsalVideoPollDecision =
+  | { kind: "retry" }
+  | { kind: "pending" }
+  | { kind: "completed"; videoUrl: string }
+  | { kind: "failed"; message: string };
+
+export function interpretRehearsalVideoPollResponse(
+  httpStatus: number,
+  value: unknown,
+): RehearsalVideoPollDecision {
+  if (httpStatus === 409) return { kind: "retry" };
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return { kind: "failed", message: "视频轮询响应格式无效" };
+  }
+  const payload = value as Record<string, unknown>;
+  const message =
+    typeof payload.error === "string" && payload.error.trim()
+      ? payload.error.trim()
+      : null;
+  if (httpStatus < 200 || httpStatus >= 300 || payload.ok !== true) {
+    return { kind: "failed", message: message ?? `视频轮询失败（HTTP ${httpStatus}）` };
+  }
+  if (payload.status === "failed") {
+    return { kind: "failed", message: message ?? "视频任务失败" };
+  }
+  if (payload.status === "completed") {
+    const videoUrl =
+      typeof payload.videoUrl === "string" ? payload.videoUrl.trim() : "";
+    return videoUrl
+      ? { kind: "completed", videoUrl }
+      : { kind: "failed", message: "视频已完成但未返回播放地址" };
+  }
+  if (payload.status === "queued" || payload.status === "processing") {
+    return { kind: "pending" };
+  }
+  return { kind: "failed", message: "视频轮询响应包含未知状态" };
+}

@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   asFailedRehearsalScriptRetry,
   createRehearsalScriptRequest,
+  interpretRehearsalVideoPollResponse,
   type RehearsalScriptRequestBody,
 } from "@/lib/pipeline/rehearsalClientRun";
 import {
@@ -289,22 +290,16 @@ export function RehearsalTheaterView() {
       const response = await fetch(`/api/pipeline/jobs/${encodeURIComponent(pipelineJobId)}`, {
         headers: { ...apiHeaders },
       });
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        error?: unknown;
-        status?: string;
-        videoUrl?: string;
-      };
-      if (!response.ok || !payload.ok) {
-        throw new Error(getApiErrorField(payload.error, "轮询失败"));
+      const decision = interpretRehearsalVideoPollResponse(
+        response.status,
+        await response.json(),
+      );
+      if (decision.kind === "retry") {
+        setPipelineStep("检测到其他会话更新，正在同步视频状态…");
+        continue;
       }
-      if (payload.status === "failed") {
-        throw new Error(getApiErrorField(payload.error, "视频任务失败"));
-      }
-      if (payload.status === "completed") {
-        if (payload.videoUrl) return payload.videoUrl;
-        throw new Error(getApiErrorField(payload.error, "视频已完成但未返回播放地址"));
-      }
+      if (decision.kind === "failed") throw new Error(decision.message);
+      if (decision.kind === "completed") return decision.videoUrl;
       if (i % 15 === 0 && i > 0) {
         setPipelineStep(`轮询视频状态…（已等待约 ${Math.round((i * POLL_INTERVAL_MS) / 60_000)} 分钟）`);
       }
