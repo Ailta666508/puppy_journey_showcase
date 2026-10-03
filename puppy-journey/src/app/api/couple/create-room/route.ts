@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     const inviteCode = typeof codeRaw === "string" ? codeRaw : String(codeRaw ?? "");
     if (inviteCode.length !== 6) continue;
 
-    const row =
+    const row: { invite_code: string; yellow_dog_id: string | null; white_dog_id: string | null } =
       role === "yellow_dog"
         ? { invite_code: inviteCode, yellow_dog_id: user.id, white_dog_id: null as string | null }
         : { invite_code: inviteCode, yellow_dog_id: null as string | null, white_dog_id: user.id };

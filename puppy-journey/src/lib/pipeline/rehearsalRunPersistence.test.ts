@@ -9,8 +9,10 @@ import {
   completeRehearsalStage,
   createRehearsalRunState,
   failRehearsalStage,
+  retryFailedRehearsalStage,
   startRehearsalStage,
 } from "./rehearsalRunState";
+import { REHEARSAL_STAGES, type RehearsalRunState } from "./types";
 
 function failedScriptRun() {
   let run = createRehearsalRunState({
@@ -26,6 +28,64 @@ function failedScriptRun() {
 }
 
 describe("rehearsal run persistence", () => {
+  it("round-trips every pipeline boundary including retry and completion", () => {
+    let run = createRehearsalRunState({
+      id: "run-1", coupleId: "couple-1", authorId: "profile-1",
+      now: "2026-10-03T09:00:00.000Z",
+    });
+    const now = "2026-10-03T09:01:00.000Z";
+    const roundTrip = (value: RehearsalRunState) => {
+      const restored = rehearsalRunFromPersistence(rehearsalRunToPersistence(value));
+      expect(restored).toEqual(value);
+      return restored;
+    };
+    run = roundTrip(run);
+    for (const stage of REHEARSAL_STAGES) {
+      run = roundTrip(startRehearsalStage(run, stage, now));
+      run = roundTrip(failRehearsalStage(run, stage, "synthetic failure", now));
+      run = roundTrip(retryFailedRehearsalStage(run, stage, now));
+      run = roundTrip(completeRehearsalStage(run, stage, now));
+    }
+    expect(run.status).toBe("completed");
+    expect(Object.values(run.stages).every((stage) => stage.attempt === 2)).toBe(true);
+  });
+
+  const invalidStates: [string, (run: RehearsalRunState) => void][] = [
+    ["all pending marked completed", (run) => {
+      for (const stage of REHEARSAL_STAGES) run.stages[stage] = { status: "pending", attempt: 0 };
+      run.status = "completed";
+    }],
+    ["pending gap before frontier", (run) => { run.stages.context = { status: "pending", attempt: 0 }; }],
+    ["completed after frontier", (run) => { run.stages.video = { ...run.stages.context }; }],
+    ["negative attempt", (run) => { run.stages.script.attempt = -1; }],
+    ["fractional attempt", (run) => { run.stages.script.attempt = 1.5; }],
+    ["unsafe attempt", (run) => { run.stages.script.attempt = Number.MAX_SAFE_INTEGER + 1; }],
+    ["pending with previous attempt", (run) => { run.stages.video.attempt = 1; }],
+    ["invalid stage timestamp", (run) => { run.stages.script.startedAt = "invalid"; }],
+    ["completion before start", (run) => { run.stages.script.completedAt = "2026-09-03T09:02:30.000Z"; }],
+    ["start before predecessor completed", (run) => { run.stages.script.startedAt = "2026-09-03T09:01:30.000Z"; }],
+    ["completion after run update", (run) => { run.stages.script.completedAt = "2026-09-03T09:05:00.000Z"; }],
+    ["pending with start metadata", (run) => { run.stages.image.startedAt = run.updatedAt; }],
+    ["running with completion metadata", (run) => {
+      run.stages.script.status = "running";
+      delete run.stages.script.error;
+      run.status = "running";
+    }],
+    ["completed with error", (run) => { run.stages.context.error = "stale error"; }],
+    ["ready with failure metadata", (run) => { run.stages.script.status = "ready"; run.status = "running"; }],
+    ["invalid stage status", (run) => { Object.assign(run.stages.script, { status: "unknown" }); }],
+    ["invalid run status", (run) => { Object.assign(run, { status: "unknown" }); }],
+    ["invalid schema version", (run) => { Object.assign(run, { schemaVersion: 2 }); }],
+  ];
+
+  it.each(invalidStates)("rejects %s on both write and restore", (_name, mutate) => {
+    const run = failedScriptRun();
+    const row = rehearsalRunToPersistence(run);
+    mutate(run);
+    expect(() => rehearsalRunToPersistence(run)).toThrow(RehearsalRunPersistenceError);
+    expect(() => rehearsalRunFromPersistence({ ...row, run_state: run })).toThrow(RehearsalRunPersistenceError);
+  });
+
   it("round-trips a failed run without losing completed stage progress", () => {
     const run = failedScriptRun();
     const row = rehearsalRunToPersistence(run);

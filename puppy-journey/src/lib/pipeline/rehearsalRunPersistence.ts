@@ -57,7 +57,7 @@ function parseStage(value: unknown, stage: RehearsalStage): RehearsalStageState 
   if (!isRecord(value) || !STAGE_STATUSES.has(value.status as RehearsalStageStatus)) {
     throw new RehearsalRunPersistenceError(`stages.${stage}.status is invalid`);
   }
-  if (!Number.isInteger(value.attempt) || Number(value.attempt) < 0) {
+  if (!Number.isSafeInteger(value.attempt) || Number(value.attempt) < 0) {
     throw new RehearsalRunPersistenceError(`stages.${stage}.attempt must be a non-negative integer`);
   }
   return {
@@ -76,6 +76,9 @@ function assertValidTimestamp(value: string, field: string): void {
 }
 
 export function assertRehearsalRunState(run: RehearsalRunState): void {
+  if (run.schemaVersion !== 1 || !RUN_STATUSES.has(run.status)) {
+    throw new RehearsalRunPersistenceError("invalid run schema version or status");
+  }
   requiredString(run.id, "id");
   requiredString(run.coupleId, "coupleId");
   requiredString(run.authorId, "authorId");
@@ -86,15 +89,40 @@ export function assertRehearsalRunState(run: RehearsalRunState): void {
   }
 
   let frontier: RehearsalStageState | undefined;
+  let previousCompletedAt = Date.parse(run.createdAt);
   for (const stage of REHEARSAL_STAGES) {
-    const state = run.stages[stage];
-    if (!state) {
+    const raw = run.stages[stage];
+    if (!raw) {
       throw new RehearsalRunPersistenceError(`stages.${stage} is missing`);
+    }
+    // Apply the same runtime checks to writes and reads.
+    const state = parseStage(raw, stage);
+    for (const field of ["startedAt", "completedAt"] as const) {
+      const timestamp = state[field];
+      if (timestamp !== undefined) {
+        assertValidTimestamp(timestamp, `stages.${stage}.${field}`);
+        if (Date.parse(timestamp) < previousCompletedAt || Date.parse(timestamp) > Date.parse(run.updatedAt)) {
+          throw new RehearsalRunPersistenceError(`stage ${stage} timestamp is outside pipeline bounds`);
+        }
+      }
+    }
+    if (state.startedAt && state.completedAt && Date.parse(state.completedAt) < Date.parse(state.startedAt)) {
+      throw new RehearsalRunPersistenceError(`stage ${stage} completes before it starts`);
+    }
+    if (["pending", "ready"].includes(state.status) && (state.startedAt || state.completedAt || state.error)) {
+      throw new RehearsalRunPersistenceError(`inactive stage ${stage} contains execution metadata`);
+    }
+    if (state.status !== "failed" && state.error !== undefined) {
+      throw new RehearsalRunPersistenceError(`stage ${stage} has an error without failed status`);
+    }
+    if (state.status === "running" && state.completedAt !== undefined) {
+      throw new RehearsalRunPersistenceError(`running stage ${stage} has a completion timestamp`);
     }
     if (!frontier && state.status === "completed") {
       if (state.attempt < 1 || !state.startedAt || !state.completedAt) {
         throw new RehearsalRunPersistenceError(`completed stage ${stage} lacks attempt timestamps`);
       }
+      previousCompletedAt = Date.parse(state.completedAt);
       continue;
     }
     if (!frontier && ["ready", "running", "failed"].includes(state.status)) {
@@ -107,7 +135,7 @@ export function assertRehearsalRunState(run: RehearsalRunState): void {
       }
       continue;
     }
-    if (state.status !== "pending") {
+    if (!frontier || state.status !== "pending" || state.attempt !== 0) {
       throw new RehearsalRunPersistenceError(`stage ${stage} is out of pipeline order`);
     }
   }
@@ -122,7 +150,7 @@ export function assertRehearsalRunState(run: RehearsalRunState): void {
   const expectedStatus: RehearsalRunStatus =
     frontier.status === "failed"
       ? "failed"
-      : frontier.status === "ready" && REHEARSAL_STAGES[0] === "context" && run.stages.context.attempt === 0
+      : frontier.status === "ready" && run.stages.context.status === "ready" && run.stages.context.attempt === 0
         ? "queued"
         : "running";
   if (run.status !== expectedStatus) {
