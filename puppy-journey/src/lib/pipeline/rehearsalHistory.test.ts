@@ -9,6 +9,7 @@ import {
   msUntilInterruptedVideoRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
+  selectRehearsalHistory,
   summarizeRehearsalFailure,
   summarizeRehearsalProgress,
   type RehearsalHistoryRun,
@@ -306,5 +307,45 @@ describe("parseRehearsalHistoryResponse", () => {
     })[0]!;
 
     expect(summarizeRehearsalProgress(run)).toMatchObject({ percent: 100, label: "全部完成" });
+  });
+});
+
+
+describe("history search, status filters and pagination", () => {
+  const runs = parseRehearsalHistoryResponse({ runs: Array.from({ length: 9 }, (_, index) => ({
+    id: `run-${index}`, status: ["completed", "failed", "processing"][index % 3],
+    userText: index === 0 ? "ＣＡＦＥ" : `旅行 ${index}`,
+    script: { scene: "Barcelona", theme: "点单", level: "beginner", script: [] },
+  })) });
+
+  it("makes every loaded record reachable without mutating source order", () => {
+    const before = runs.map((run) => run.id);
+    const pages = [1, 2, 3].flatMap((page) => selectRehearsalHistory(runs, { page }).runs);
+    expect(pages.map((run) => run.id)).toEqual(before);
+    expect(runs.map((run) => run.id)).toEqual(before);
+    expect(selectRehearsalHistory(runs, { page: 99 }).page).toBe(3);
+  });
+
+  it("matches normalized titles, scene and theme together with status", () => {
+    expect(selectRehearsalHistory(runs, { query: " cafe " }).runs.map((run) => run.id)).toEqual(["run-0"]);
+    expect(selectRehearsalHistory(runs, { query: "barcelona", status: "failed" }).total).toBe(3);
+    expect(selectRehearsalHistory(runs, { query: "点单", status: "active" }).runs.every((run) => run.status === "processing")).toBe(true);
+    expect(selectRehearsalHistory(runs, { status: "completed" }).total).toBe(3);
+  });
+
+  it("clamps the page when filters or refreshed results shrink the list", () => {
+    expect(selectRehearsalHistory(runs, { page: 3, status: "failed" }).page).toBe(1);
+    expect(selectRehearsalHistory([], { page: 3 })).toEqual({ runs: [], total: 0, page: 1, pageCount: 1 });
+    expect(selectRehearsalHistory(runs, { query: "no match" }).total).toBe(0);
+  });
+
+  it("keeps active polling independent of the selected completed view", () => {
+    const view = selectRehearsalHistory(runs, { status: "completed" });
+    expect(hasActiveRehearsalRuns(view.runs)).toBe(false);
+    expect(hasActiveRehearsalRuns(runs)).toBe(true);
+  });
+
+  it.each([0, -1, 1.5, NaN])("rejects invalid page %s", (page) => {
+    expect(() => selectRehearsalHistory(runs, { page })).toThrow();
   });
 });

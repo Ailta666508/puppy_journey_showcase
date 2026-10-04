@@ -278,3 +278,32 @@ export function summarizeRehearsalFailure(
     message,
   };
 }
+
+
+export type RehearsalHistoryFilter = "all" | "active" | "failed" | "completed";
+
+/** Browse the authorized response only; filtering never affects background polling. */
+export function selectRehearsalHistory(
+  runs: RehearsalHistoryRun[],
+  options: { query?: string; status?: RehearsalHistoryFilter; page?: number; pageSize?: number } = {},
+): { runs: RehearsalHistoryRun[]; total: number; page: number; pageCount: number } {
+  const { query = "", status = "all", page = 1, pageSize = 4 } = options;
+  if (!["all", "active", "failed", "completed"].includes(status)) throw new Error("无效的历史状态筛选");
+  if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1) {
+    throw new Error("历史分页参数必须是正整数");
+  }
+  const normalize = (text: string) => text.normalize("NFKC").toLocaleLowerCase().trim();
+  const needle = normalize(query);
+  const matches = runs.filter((run) => {
+    const statusMatches = status === "all" || (status === "active"
+      ? run.status === "queued" || run.status === "processing"
+      : run.status === status);
+    const textMatches = !needle || [run.userText, run.script?.scene ?? "", run.script?.theme ?? ""]
+      .some((text) => normalize(text).includes(needle));
+    return statusMatches && textMatches;
+  });
+  const pageCount = Math.max(1, Math.ceil(matches.length / pageSize));
+  const resolvedPage = Math.min(page, pageCount);
+  const start = (resolvedPage - 1) * pageSize;
+  return { runs: matches.slice(start, start + pageSize), total: matches.length, page: resolvedPage, pageCount };
+}

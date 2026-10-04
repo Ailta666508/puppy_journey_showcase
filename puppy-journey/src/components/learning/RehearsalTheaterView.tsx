@@ -28,6 +28,8 @@ import {
   msUntilInterruptedVideoRecovery,
   parseRehearsalHistoryResponse,
   retryableFailedStage,
+  selectRehearsalHistory,
+  type RehearsalHistoryFilter,
   summarizeRehearsalFailure,
   summarizeRehearsalProgress,
   type RehearsalHistoryRun,
@@ -107,12 +109,26 @@ export function RehearsalTheaterView() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRetryId, setHistoryRetryId] = useState<string | null>(null);
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyFilter, setHistoryFilter] = useState<RehearsalHistoryFilter>("all");
+  const [historyPage, setHistoryPage] = useState(1);
+  const historyView = selectRehearsalHistory(rehearsalHistory, {
+    query: historyQuery, status: historyFilter, page: historyPage,
+  });
 
   const [playing, setPlaying] = useState(false);
   const [playProgress, setPlayProgress] = useState(0);
   const playStartRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastScriptRequestRef = useRef<RehearsalScriptRequestBody | null>(null);
+  const changePhase = useCallback((next: Phase) => {
+    if (next !== "cinema") {
+      setPlaying(false);
+      setPlayProgress(0);
+    }
+    setPhase(next);
+  }, []);
+
 
   const refreshRehearsalHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -132,7 +148,8 @@ export function RehearsalTheaterView() {
   }, []);
 
   useEffect(() => {
-    void refreshRehearsalHistory();
+    const timer = window.setTimeout(() => void refreshRehearsalHistory(), 0);
+    return () => window.clearTimeout(timer);
   }, [refreshRehearsalHistory]);
 
   useEffect(() => {
@@ -161,11 +178,12 @@ export function RehearsalTheaterView() {
 
   useEffect(() => {
     let cancelled = false;
-    setTravelLogLoading(true);
-    setTravelLogFetchError(null);
     void (async () => {
       try {
         const headers = await supabaseBearerHeaders();
+        if (cancelled) return;
+        setTravelLogLoading(true);
+        setTravelLogFetchError(null);
         const res = await fetch("/api/travel-logs", {
           cache: "no-store",
           headers: { ...headers },
@@ -222,8 +240,6 @@ export function RehearsalTheaterView() {
 
   useEffect(() => {
     if (phase !== "cinema") {
-      setPlaying(false);
-      setPlayProgress(0);
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
       playStartRef.current = null;
@@ -245,7 +261,7 @@ export function RehearsalTheaterView() {
         setPlaying(false);
         setPlayProgress(0);
         stopPlayLoop();
-        setPhase("vocab");
+        changePhase("vocab");
         return;
       }
       rafRef.current = requestAnimationFrame(tick);
@@ -254,7 +270,7 @@ export function RehearsalTheaterView() {
     return () => {
       stopPlayLoop();
     };
-  }, [playing, stopPlayLoop, videoUrl]);
+  }, [playing, stopPlayLoop, videoUrl, changePhase]);
 
   const onPickImage = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -418,7 +434,7 @@ export function RehearsalTheaterView() {
         vidJson.status === "completed" ? vidJson.videoUrl : undefined,
       );
       setVideoUrl(finalUrl);
-      setPhase("cinema");
+      changePhase("cinema");
       setCanResumePipeline(false);
       void refreshRehearsalHistory();
     } catch (e) {
@@ -428,6 +444,7 @@ export function RehearsalTheaterView() {
       setPipelineStep("");
     }
   }, [
+    changePhase,
     userText,
     imageDataUrl,
     useDefaultSceneText,
@@ -457,7 +474,7 @@ export function RehearsalTheaterView() {
   }, [sosSentence]);
 
   const resetDemo = useCallback(() => {
-    setPhase("lobby");
+    changePhase("lobby");
     setPlaying(false);
     setPlayProgress(0);
     stopPlayLoop();
@@ -467,7 +484,7 @@ export function RehearsalTheaterView() {
     setPipelineError(null);
     setCanResumePipeline(false);
     lastScriptRequestRef.current = null;
-  }, [stopPlayLoop]);
+  }, [stopPlayLoop, changePhase]);
 
   const openHistoricalRun = useCallback((run: RehearsalHistoryRun) => {
     if (!run.videoUrl) return;
@@ -476,8 +493,8 @@ export function RehearsalTheaterView() {
     setVideoUrl(run.videoUrl);
     setPipelineError(null);
     setCanResumePipeline(false);
-    setPhase("cinema");
-  }, []);
+    changePhase("cinema");
+  }, [changePhase]);
 
   const retryHistoricalRun = useCallback(async (run: RehearsalHistoryRun) => {
     const failedStage = retryableFailedStage(run);
@@ -535,7 +552,7 @@ export function RehearsalTheaterView() {
         videoPayload.status === "completed" ? videoPayload.videoUrl : undefined,
       );
       setVideoUrl(finalUrl);
-      setPhase("cinema");
+      changePhase("cinema");
       await refreshRehearsalHistory();
     } catch (error) {
       setPipelineError(getErrorMessage(error));
@@ -545,7 +562,7 @@ export function RehearsalTheaterView() {
       setPipelineLoading(false);
       setPipelineStep("");
     }
-  }, [historyNowMs, refreshRehearsalHistory, waitForVideo]);
+  }, [historyNowMs, refreshRehearsalHistory, waitForVideo, changePhase]);
 
   const resumeHistoricalVideo = useCallback(async (run: RehearsalHistoryRun) => {
     const recoveringSubmission = canRecoverInterruptedVideoSubmission(run, historyNowMs);
@@ -584,7 +601,7 @@ export function RehearsalTheaterView() {
         payload.status === "completed" ? payload.videoUrl : undefined,
       );
       setVideoUrl(finalUrl);
-      setPhase("cinema");
+      changePhase("cinema");
       await refreshRehearsalHistory();
     } catch (error) {
       setPipelineError(getErrorMessage(error));
@@ -594,7 +611,7 @@ export function RehearsalTheaterView() {
       setPipelineLoading(false);
       setPipelineStep("");
     }
-  }, [historyNowMs, refreshRehearsalHistory, waitForVideo]);
+  }, [historyNowMs, refreshRehearsalHistory, waitForVideo, changePhase]);
 
   const vocabCards =
     script?.script?.map((line, i) => ({
@@ -740,7 +757,7 @@ export function RehearsalTheaterView() {
                 ) : null}
                 <div className="rounded-lg border border-white/10 bg-black/25 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-amber-100/85">最近排练</p>
+                    <p className="text-xs font-medium text-amber-100/85">最近排练 · 最近 20 条</p>
                     <Button
                       type="button"
                       variant="ghost"
@@ -752,12 +769,33 @@ export function RehearsalTheaterView() {
                       {historyLoading ? "同步中…" : "刷新"}
                     </Button>
                   </div>
+                  <div className="mb-2 flex gap-2">
+                    <input
+                      type="search"
+                      aria-label="搜索排练主题或场景"
+                      placeholder="搜索主题或场景"
+                      value={historyQuery}
+                      onChange={(event) => { setHistoryQuery(event.target.value); setHistoryPage(1); }}
+                      className="min-w-0 flex-1 rounded border border-white/20 bg-zinc-900 px-2 py-1 text-xs text-white"
+                    />
+                    <select
+                      aria-label="筛选排练状态"
+                      value={historyFilter}
+                      onChange={(event) => { setHistoryFilter(event.target.value as RehearsalHistoryFilter); setHistoryPage(1); }}
+                      className="rounded border border-white/20 bg-zinc-900 px-2 py-1 text-xs text-white"
+                    >
+                      <option value="all">全部</option>
+                      <option value="active">进行中</option>
+                      <option value="failed">失败</option>
+                      <option value="completed">已完成</option>
+                    </select>
+                  </div>
                   {historyError ? <p className="text-[10px] text-amber-200/80">{historyError}</p> : null}
-                  {!historyLoading && !historyError && rehearsalHistory.length === 0 ? (
-                    <p className="text-[10px] text-white/45">完成一次排练后可从这里重新放映。</p>
+                  {!historyLoading && !historyError && historyView.total === 0 ? (
+                    <p className="text-[10px] text-white/45">没有匹配的排练；可清空搜索或切换状态。</p>
                   ) : null}
                   <div className="space-y-1.5">
-                    {rehearsalHistory.slice(0, 4).map((run) => {
+                    {historyView.runs.map((run) => {
                       const progress = summarizeRehearsalProgress(run);
                       const failure = summarizeRehearsalFailure(run);
                       return (
@@ -850,6 +888,19 @@ export function RehearsalTheaterView() {
                       );
                     })}
                   </div>
+                  <nav aria-label="排练历史分页" className="mt-2 flex items-center justify-between gap-2">
+                    <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] text-white/70"
+                      disabled={historyView.page <= 1} onClick={() => setHistoryPage(historyView.page - 1)}>
+                      上一页
+                    </Button>
+                    <p aria-live="polite" className="text-[10px] text-white/60">
+                      {historyView.total} 条 · {historyView.page}/{historyView.pageCount} 页
+                    </p>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] text-white/70"
+                      disabled={historyView.page >= historyView.pageCount} onClick={() => setHistoryPage(historyView.page + 1)}>
+                      下一页
+                    </Button>
+                  </nav>
                 </div>
               </div>
               <div className="relative flex shrink-0 justify-center px-4 py-3">
@@ -890,7 +941,7 @@ export function RehearsalTheaterView() {
                     type="button"
                     variant="outline"
                     className="border-white/25 text-white hover:bg-white/10"
-                    onClick={() => setPhase("cinema")}
+                    onClick={() => changePhase("cinema")}
                   >
                     仅演示放映 UI
                   </Button>
@@ -1013,7 +1064,7 @@ export function RehearsalTheaterView() {
                 onClick={() => {
                   setPlayProgress(0);
                   setPlaying(false);
-                  setPhase("cinema");
+                  changePhase("cinema");
                 }}
               >
                 再看一遍放映
