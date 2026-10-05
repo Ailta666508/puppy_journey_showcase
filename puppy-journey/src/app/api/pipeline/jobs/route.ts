@@ -2,11 +2,9 @@ import { NextResponse } from "next/server";
 
 import { requireCoupleWorkspaceContext } from "@/lib/couple/coupleWorkspaceContext";
 import { rehearsalJobOwnedByContext } from "@/lib/pipeline/rehearsalJobAccess";
+import { parseHistoryLimit } from "@/lib/pipeline/rehearsalHistoryLimit";
 
 export const maxDuration = 30;
-
-const HISTORY_LIMIT = 20;
-const MAX_HISTORY_LIMIT = 50;
 
 export async function GET(req: Request) {
   try {
@@ -14,12 +12,11 @@ export async function GET(req: Request) {
     if (!gate.ok) return gate.response;
     const { supabase, coupleId, userId } = gate.ctx;
     const rawLimit = new URL(req.url).searchParams.get("limit");
-    const requestedLimit = rawLimit === null ? HISTORY_LIMIT : Number(rawLimit);
-    if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > MAX_HISTORY_LIMIT) {
-      return NextResponse.json(
-        { ok: false, error: `limit must be an integer between 1 and ${MAX_HISTORY_LIMIT}` },
-        { status: 400 },
-      );
+    let requestedLimit: number;
+    try {
+      requestedLimit = parseHistoryLimit(rawLimit);
+    } catch {
+      return NextResponse.json({ ok: false, error: "limit must be an integer between 1 and 50" }, { status: 400 });
     }
 
     const { data, error } = await supabase

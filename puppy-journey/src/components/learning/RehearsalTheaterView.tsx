@@ -130,12 +130,13 @@ export function RehearsalTheaterView() {
   }, []);
 
 
+  const [historyLimit, setHistoryLimit] = useState(20);
   const refreshRehearsalHistory = useCallback(async () => {
     setHistoryLoading(true);
     setHistoryError(null);
     try {
       const headers = await supabaseBearerHeaders();
-      const response = await fetch("/api/pipeline/jobs", { cache: "no-store", headers: { ...headers } });
+      const response = await fetch(`/api/pipeline/jobs?limit=${historyLimit}`, { cache: "no-store", headers: { ...headers } });
       const payload = await response.json() as unknown;
       if (!response.ok) throw new Error(`排练历史请求失败 ${response.status}`);
       setRehearsalHistory(parseRehearsalHistoryResponse(payload));
@@ -145,7 +146,7 @@ export function RehearsalTheaterView() {
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [historyLimit]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void refreshRehearsalHistory(), 0);
@@ -757,7 +758,19 @@ export function RehearsalTheaterView() {
                 ) : null}
                 <div className="rounded-lg border border-white/10 bg-black/25 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-amber-100/85">最近排练 · 最近 20 条</p>
+                    <label className="text-xs font-medium text-amber-100/85">
+                      最近排练 ·
+                      <select
+                        aria-label="排练历史加载范围"
+                        value={historyLimit}
+                        disabled={historyLoading}
+                        onChange={(event) => { setHistoryLimit(Number(event.target.value)); setHistoryPage(1); }}
+                        className="ml-1 rounded border border-white/20 bg-zinc-900 px-1 py-1 text-xs text-white"
+                      >
+                        <option value={20}>最近 20 条</option>
+                        <option value={50}>最近 50 条</option>
+                      </select>
+                    </label>
                     <Button
                       type="button"
                       variant="ghost"
