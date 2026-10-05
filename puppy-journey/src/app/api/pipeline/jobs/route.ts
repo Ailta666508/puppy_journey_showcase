@@ -6,12 +6,21 @@ import { rehearsalJobOwnedByContext } from "@/lib/pipeline/rehearsalJobAccess";
 export const maxDuration = 30;
 
 const HISTORY_LIMIT = 20;
+const MAX_HISTORY_LIMIT = 50;
 
 export async function GET(req: Request) {
   try {
     const gate = await requireCoupleWorkspaceContext(req);
     if (!gate.ok) return gate.response;
     const { supabase, coupleId, userId } = gate.ctx;
+    const rawLimit = new URL(req.url).searchParams.get("limit");
+    const requestedLimit = rawLimit === null ? HISTORY_LIMIT : Number(rawLimit);
+    if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1 || requestedLimit > MAX_HISTORY_LIMIT) {
+      return NextResponse.json(
+        { ok: false, error: `limit must be an integer between 1 and ${MAX_HISTORY_LIMIT}` },
+        { status: 400 },
+      );
+    }
 
     const { data, error } = await supabase
       .from("rehearsal_pipeline_jobs")
@@ -20,7 +29,7 @@ export async function GET(req: Request) {
       )
       .eq("couple_id", coupleId)
       .order("updated_at", { ascending: false })
-      .limit(HISTORY_LIMIT);
+      .limit(requestedLimit);
     if (error) throw error;
 
     const runs = (data ?? [])
