@@ -188,3 +188,7 @@ The repository also includes `scripts/verify-supabase-image-upload.mjs` for vali
 - Production use would require broader automated tests, monitoring, deletion workflows, and a complete privacy review.
 
 **Note:** This project was initially developed locally. The Git repository was created when the codebase was prepared for publication, so the early development history is unavailable. Subsequent updates are tracked in this repository.
+
+### Saved rehearsal transcripts
+
+In rehearsal history, use 查看剧本 on any saved script, including runs whose video failed. The dialog displays ordered dialogue, lets you hide translations for practice, and downloads a UTF-8 bilingual text file. It uses only the already authorized history response and does not retry providers or export provider URLs/IDs.

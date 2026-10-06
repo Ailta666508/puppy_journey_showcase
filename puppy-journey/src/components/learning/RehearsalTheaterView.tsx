@@ -35,6 +35,7 @@ import {
   type RehearsalHistoryRun,
 } from "@/lib/pipeline/rehearsalHistory";
 import { DEFAULT_PIPELINE_IMAGE_CONTEXT_ZH } from "@/lib/pipeline/prompts";
+import { rehearsalTranscript, transcriptLines } from "@/lib/pipeline/rehearsalTranscript";
 import type { LessonScript } from "@/lib/pipeline/types";
 import { getApiErrorField, getErrorMessage } from "@/lib/getErrorMessage";
 import { normalizePhotoUrls } from "@/lib/normalizePhotoUrls";
@@ -129,6 +130,18 @@ export function RehearsalTheaterView() {
     setPhase(next);
   }, []);
 
+
+  const [transcriptScript, setTranscriptScript] = useState<LessonScript | null>(null);
+  const [showTranslation, setShowTranslation] = useState(true);
+  const downloadTranscript = () => {
+    if (!transcriptScript) return;
+    const url = URL.createObjectURL(new Blob([rehearsalTranscript(transcriptScript)], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "rehearsal-transcript.txt";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   const [historyLimit, setHistoryLimit] = useState(20);
   const refreshRehearsalHistory = useCallback(async () => {
@@ -756,6 +769,30 @@ export function RehearsalTheaterView() {
                     ) : null}
                   </div>
                 ) : null}
+                <Dialog open={transcriptScript !== null} onOpenChange={(open) => { if (!open) setTranscriptScript(null); }}>
+                  <DialogContent className="max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>{transcriptScript?.theme || "排练剧本"}</DialogTitle>
+                      <DialogDescription>{transcriptScript?.scene} · 已保存的双语练习，视频未完成时也可使用。</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex gap-3">
+                      <Button type="button" variant="outline" aria-pressed={showTranslation} onClick={() => setShowTranslation(!showTranslation)}>
+                        {showTranslation ? "隐藏翻译" : "显示翻译"}
+                      </Button>
+                      <Button type="button" onClick={downloadTranscript}>下载双语文本</Button>
+                    </div>
+                    <ol className="space-y-4">
+                      {transcriptScript ? transcriptLines(transcriptScript).map((line, index) => (
+                        <li key={index} className="rounded border p-3">
+                          <p className="text-sm font-semibold">{line.character} · {line.type === "player" ? "你的台词" : "对方台词"}</p>
+                          <p lang="es">{line.text}</p>
+                          {showTranslation && typeof line.translation === "string" ? <p className="mt-1 text-sm text-muted-foreground">{line.translation}</p> : null}
+                        </li>
+                      )) : null}
+                    </ol>
+                    {transcriptScript && transcriptLines(transcriptScript).length === 0 ? <p>暂无可用台词。</p> : null}
+                  </DialogContent>
+                </Dialog>
                 <div className="rounded-lg border border-white/10 bg-black/25 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <label className="text-xs font-medium text-amber-100/85">
@@ -842,6 +879,13 @@ export function RehearsalTheaterView() {
                               </p>
                             ) : null}
                           </div>
+                          {run.script ? (
+                            <Button type="button" size="sm" variant="outline"
+                              className="h-7 px-2 text-[10px]"
+                              onClick={() => { setTranscriptScript(run.script); setShowTranslation(true); }}>
+                              查看剧本
+                            </Button>
+                          ) : null}
                           {run.status === "completed" && run.videoUrl ? (
                             <Button
                               type="button"
