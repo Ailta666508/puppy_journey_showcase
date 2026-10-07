@@ -20,13 +20,14 @@ import {
   type RehearsalScriptRequestBody,
 } from "@/lib/pipeline/rehearsalClientRun";
 import {
+  appendUniqueRehearsalRuns,
   canRecoverInterruptedImage,
   canRecoverInterruptedVideoSubmission,
   canResumeVideoPolling,
   hasActiveRehearsalRuns,
   msUntilInterruptedImageRecovery,
   msUntilInterruptedVideoRecovery,
-  parseRehearsalHistoryResponse,
+  parseRehearsalHistoryPage,
   retryableFailedStage,
   selectRehearsalHistory,
   type RehearsalHistoryFilter,
@@ -110,6 +111,8 @@ export function RehearsalTheaterView() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRetryId, setHistoryRetryId] = useState<string | null>(null);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyLoadingOlder, setHistoryLoadingOlder] = useState(false);
   const [historyQuery, setHistoryQuery] = useState("");
   const [historyFilter, setHistoryFilter] = useState<RehearsalHistoryFilter>("all");
   const [historyPage, setHistoryPage] = useState(1);
@@ -152,7 +155,9 @@ export function RehearsalTheaterView() {
       const response = await fetch(`/api/pipeline/jobs?limit=${historyLimit}`, { cache: "no-store", headers: { ...headers } });
       const payload = await response.json() as unknown;
       if (!response.ok) throw new Error(`排练历史请求失败 ${response.status}`);
-      setRehearsalHistory(parseRehearsalHistoryResponse(payload));
+      const page = parseRehearsalHistoryPage(payload);
+      setRehearsalHistory(page.runs);
+      setHistoryCursor(page.nextCursor);
       setHistoryNowMs(Date.now());
     } catch (error) {
       setHistoryError(getErrorMessage(error));
@@ -160,6 +165,26 @@ export function RehearsalTheaterView() {
       setHistoryLoading(false);
     }
   }, [historyLimit]);
+
+  const loadOlderRehearsalHistory = useCallback(async () => {
+    if (!historyCursor || historyLoadingOlder) return;
+    setHistoryLoadingOlder(true);
+    setHistoryError(null);
+    try {
+      const headers = await supabaseBearerHeaders();
+      const params = new URLSearchParams({ limit: String(historyLimit), cursor: historyCursor });
+      const response = await fetch(`/api/pipeline/jobs?${params}`, { cache: "no-store", headers: { ...headers } });
+      const payload = await response.json() as unknown;
+      if (!response.ok) throw new Error(`排练历史请求失败 ${response.status}`);
+      const page = parseRehearsalHistoryPage(payload);
+      setRehearsalHistory((current) => appendUniqueRehearsalRuns(current, page.runs));
+      setHistoryCursor(page.nextCursor);
+    } catch (error) {
+      setHistoryError(getErrorMessage(error));
+    } finally {
+      setHistoryLoadingOlder(false);
+    }
+  }, [historyCursor, historyLimit, historyLoadingOlder]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void refreshRehearsalHistory(), 0);
@@ -958,6 +983,18 @@ export function RehearsalTheaterView() {
                       下一页
                     </Button>
                   </nav>
+                  {historyCursor ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-full text-[10px]"
+                      disabled={historyLoadingOlder}
+                      onClick={() => void loadOlderRehearsalHistory()}
+                    >
+                      {historyLoadingOlder ? "正在加载…" : "加载更早记录"}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
               <div className="relative flex shrink-0 justify-center px-4 py-3">

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  appendUniqueRehearsalRuns,
   canRecoverInterruptedVideoSubmission,
   canRecoverInterruptedImage,
   canResumeVideoPolling,
@@ -8,6 +9,7 @@ import {
   msUntilInterruptedImageRecovery,
   msUntilInterruptedVideoRecovery,
   parseRehearsalHistoryResponse,
+  parseRehearsalHistoryPage,
   retryableFailedStage,
   selectRehearsalHistory,
   summarizeRehearsalFailure,
@@ -23,6 +25,22 @@ const SCRIPT = {
 } as const;
 
 describe("parseRehearsalHistoryResponse", () => {
+  it("parses pagination metadata and appends older runs without duplicates", () => {
+    const first = parseRehearsalHistoryPage({
+      runs: [{ id: "run-1", status: "completed", updatedAt: "", createdAt: "" }],
+      nextCursor: "opaque-cursor",
+    });
+    const older = parseRehearsalHistoryPage({
+      runs: [
+        { id: "run-1", status: "completed", updatedAt: "", createdAt: "" },
+        { id: "run-2", status: "failed", updatedAt: "", createdAt: "" },
+      ],
+      nextCursor: null,
+    });
+    expect(first.nextCursor).toBe("opaque-cursor");
+    expect(appendUniqueRehearsalRuns(first.runs, older.runs).map((run) => run.id)).toEqual(["run-1", "run-2"]);
+    expect(() => parseRehearsalHistoryPage({ runs: [], nextCursor: 3 })).toThrow("无效游标");
+  });
   it("keeps playable fields from valid persisted runs", () => {
     const runs = parseRehearsalHistoryResponse({
       runs: [{

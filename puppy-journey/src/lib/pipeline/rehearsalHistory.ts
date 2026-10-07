@@ -17,6 +17,7 @@ export type RehearsalHistoryRun = {
   thumbnailUrl: string | null;
   providerTaskId: string | null;
   error: string | null;
+  createdAt: string;
   updatedAt: string;
 };
 
@@ -64,12 +65,12 @@ function isLessonScript(value: unknown): value is LessonScript {
   );
 }
 
-export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryRun[] {
+export function parseRehearsalHistoryPage(value: unknown): { runs: RehearsalHistoryRun[]; nextCursor: string | null } {
   if (!value || typeof value !== "object") throw new Error("排练历史接口返回无效");
   const runs = (value as { runs?: unknown }).runs;
   if (!Array.isArray(runs)) throw new Error("排练历史接口缺少 runs");
 
-  return runs.flatMap((entry) => {
+  const parsed = runs.flatMap((entry) => {
     if (!entry || typeof entry !== "object") return [];
     const row = entry as Record<string, unknown>;
     if (typeof row.id !== "string" || !row.id || !STATUSES.has(row.status as PipelineJobStatus)) {
@@ -88,9 +89,26 @@ export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryR
       thumbnailUrl: optionalString(row.thumbnailUrl),
       providerTaskId: optionalString(row.providerTaskId),
       error: optionalString(row.error),
+      createdAt: typeof row.createdAt === "string" ? row.createdAt : "",
       updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : "",
     }];
   });
+  const nextCursor = (value as { nextCursor?: unknown }).nextCursor;
+  if (nextCursor !== undefined && nextCursor !== null && typeof nextCursor !== "string") {
+    throw new Error("排练历史接口返回无效游标");
+  }
+  return { runs: parsed, nextCursor: nextCursor ?? null };
+}
+
+export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryRun[] {
+  return parseRehearsalHistoryPage(value).runs;
+}
+
+export function appendUniqueRehearsalRuns(
+  current: RehearsalHistoryRun[], older: RehearsalHistoryRun[],
+): RehearsalHistoryRun[] {
+  const ids = new Set(current.map((run) => run.id));
+  return [...current, ...older.filter((run) => !ids.has(run.id))];
 }
 
 export function hasActiveRehearsalRuns(runs: RehearsalHistoryRun[]): boolean {

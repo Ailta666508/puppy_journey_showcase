@@ -192,3 +192,11 @@ The repository also includes `scripts/verify-supabase-image-upload.mjs` for vali
 ### Saved rehearsal transcripts
 
 In rehearsal history, use 查看剧本 on any saved script, including runs whose video failed. The dialog displays ordered dialogue, lets you hide translations for practice, and downloads a UTF-8 bilingual text file. It uses only the already authorized history response and does not retry providers or export provider URLs/IDs.
+
+### Older rehearsal history
+
+Authenticated couple workspaces can load older rehearsal pages with an opaque,
+validated cursor. Pagination uses immutable creation time plus job ID as a
+stable tie-break, requests one look-ahead row, and retains couple-scoped database
+filtering. The theater appends unique older runs without exposing cursor fields
+or provider identifiers to the learner.
