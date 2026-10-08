@@ -136,6 +136,7 @@ export function RehearsalTheaterView() {
 
   const [transcriptScript, setTranscriptScript] = useState<LessonScript | null>(null);
   const [showTranslation, setShowTranslation] = useState(true);
+  const [transcriptCopied, setTranscriptCopied] = useState(false);
   const downloadTranscript = () => {
     if (!transcriptScript) return;
     const url = URL.createObjectURL(new Blob([rehearsalTranscript(transcriptScript)], { type: "text/plain;charset=utf-8" }));
@@ -144,6 +145,12 @@ export function RehearsalTheaterView() {
     link.download = "rehearsal-transcript.txt";
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const copyTranscript = async () => {
+    if (!transcriptScript || !navigator.clipboard) return;
+    await navigator.clipboard.writeText(rehearsalTranscript(transcriptScript));
+    setTranscriptCopied(true);
+    window.setTimeout(() => setTranscriptCopied(false), 1600);
   };
 
   const [historyLimit, setHistoryLimit] = useState(20);
@@ -794,7 +801,7 @@ export function RehearsalTheaterView() {
                     ) : null}
                   </div>
                 ) : null}
-                <Dialog open={transcriptScript !== null} onOpenChange={(open) => { if (!open) setTranscriptScript(null); }}>
+                <Dialog open={transcriptScript !== null} onOpenChange={(open) => { if (!open) { setTranscriptScript(null); setTranscriptCopied(false); } }}>
                   <DialogContent className="max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>{transcriptScript?.theme || "排练剧本"}</DialogTitle>
@@ -803,6 +810,9 @@ export function RehearsalTheaterView() {
                     <div className="flex gap-3">
                       <Button type="button" variant="outline" aria-pressed={showTranslation} onClick={() => setShowTranslation(!showTranslation)}>
                         {showTranslation ? "隐藏翻译" : "显示翻译"}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => void copyTranscript()} disabled={typeof navigator === "undefined" || !navigator.clipboard}>
+                        {transcriptCopied ? "已复制" : "复制双语文本"}
                       </Button>
                       <Button type="button" onClick={downloadTranscript}>下载双语文本</Button>
                     </div>

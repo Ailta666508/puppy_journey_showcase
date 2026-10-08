@@ -191,7 +191,7 @@ The repository also includes `scripts/verify-supabase-image-upload.mjs` for vali
 
 ### Saved rehearsal transcripts
 
-In rehearsal history, use 查看剧本 on any saved script, including runs whose video failed. The dialog displays ordered dialogue, lets you hide translations for practice, and downloads a UTF-8 bilingual text file. It uses only the already authorized history response and does not retry providers or export provider URLs/IDs.
+In rehearsal history, use 查看剧本 on any saved script, including runs whose video failed. The dialog displays ordered dialogue, lets you hide translations for practice, copies the bilingual text in supported browsers, and downloads a UTF-8 bilingual text file. It uses only the already authorized history response and does not retry providers or export provider URLs/IDs.
 
 ### Older rehearsal history
 
