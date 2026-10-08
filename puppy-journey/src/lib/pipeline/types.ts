@@ -1,6 +1,7 @@
 /**
  * 西语学习管线类型（剧本 → 图 → 视频）。
  */
+import type { DubbingSpeakerKey } from "@/lib/dubbing/contracts";
 
 export type ScriptLine = {
   id: number;
@@ -10,6 +11,9 @@ export type ScriptLine = {
   translation?: string;
   startTime: number;
   endTime: number;
+  /** Stable role for dubbing. Older saved scripts may not include these fields. */
+  speakerKey?: DubbingSpeakerKey;
+  dubbable?: boolean;
 };
 
 /** Agent 1（合并感知+融合）产出的结构化剧本 */

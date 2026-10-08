@@ -4,7 +4,7 @@ import { TopNav } from "@/components/TopNav";
 import { RehearsalTheaterView } from "@/components/learning/RehearsalTheaterView";
 
 /**
- * 未来排练室：放映厅交互演示（剧场 + 看电影小狗 → 全屏占位放映 + Agent 7 → 词汇瀑布流）
+ * 未来排练室：剧本与视频生成、分角色配音、放映和词汇练习。
  */
 export default function LearningPage() {
   return (

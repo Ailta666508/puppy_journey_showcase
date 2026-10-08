@@ -1,6 +1,7 @@
 import { chatCompletionJson, chatCompletionJsonWithImage } from "@/lib/pipeline/openaiCompatibleChat";
 import { buildMergedScriptUserPrompt, MERGED_SCRIPT_SYSTEM } from "@/lib/pipeline/prompts";
 import type { LessonScript } from "@/lib/pipeline/types";
+import { isDubbingSpeakerKey, parseDubbingScript } from "@/lib/dubbing/plan";
 
 function stripMarkdownJsonFence(text: string): string {
   const t = text.trim();
@@ -24,7 +25,7 @@ function lineTranslation(o: Record<string, unknown>): string | undefined {
 function isScriptLine(x: unknown): boolean {
   if (!x || typeof x !== "object" || Array.isArray(x)) return false;
   const o = x as Record<string, unknown>;
-  const timeOk = (v: unknown) => typeof v === "number" || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)));
+  const timeOk = (v: unknown) => (typeof v === "number" && Number.isFinite(v)) || (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)));
   const hasText = lineText(o).length > 0;
   return (
     (o.type === "npc" || o.type === "player") &&
@@ -36,6 +37,12 @@ function isScriptLine(x: unknown): boolean {
 }
 
 function coerceScriptLine(o: Record<string, unknown>, index: number): LessonScript["script"][number] {
+  if (o.speakerKey !== undefined && !isDubbingSpeakerKey(o.speakerKey)) {
+    throw new Error("剧本角色编号无效，请重新生成并明确白狗、黄狗与 NPC 的分工。");
+  }
+  if (o.dubbable !== undefined && typeof o.dubbable !== "boolean") {
+    throw new Error("剧本 dubbable 字段必须为布尔值。");
+  }
   const id =
     typeof o.id === "number"
       ? o.id
@@ -52,6 +59,8 @@ function coerceScriptLine(o: Record<string, unknown>, index: number): LessonScri
     translation: lineTranslation(o),
     startTime,
     endTime,
+    ...(isDubbingSpeakerKey(o.speakerKey) ? { speakerKey: o.speakerKey } : {}),
+    ...(typeof o.dubbable === "boolean" ? { dubbable: o.dubbable } : {}),
   };
 }
 
@@ -134,5 +143,9 @@ export async function generateScript(input: GenerateScriptInput): Promise<Lesson
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("剧本 LLM 未返回 JSON 对象");
   }
-  return normalizeScript(parsed as Record<string, unknown>);
+  const script = normalizeScript(parsed as Record<string, unknown>);
+  // Validate new generations before downstream image/video calls can spend money.
+  // Previously saved scripts still load normally; the dubbing endpoint checks them separately.
+  parseDubbingScript(script);
+  return script;
 }

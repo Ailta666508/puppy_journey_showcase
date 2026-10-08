@@ -88,6 +88,14 @@ Key-frame generation now participates in the same persisted state machine. The i
 
 Video generation continues that persisted lifecycle. The server uses the saved script and generated key frame rather than trusting client-supplied media inputs, atomically claims each submission, reuses an in-flight provider task, recovers interrupted submissions, and retries only failed video stages. Authenticated polling records provider failure or completion in the same run state; a completed video also unlocks the script-derived learning cards. Pronunciation assistance is protected by the same couple-workspace authorization boundary.
 
+### Record a role
+
+The rehearsal theater also includes a role-dubbing workspace: **Listen → Record → My videos**. A saved Spanish script assigns lines to the yellow dog, white dog, and NPCs. Each partner can record their own lines, compare takes, and choose which recordings to keep. The video stays in the theater while the right panel handles the current step.
+
+Recordings are private by default. Solo videos use one person's recordings and the other role's guide voice; duet videos require both people to share their choices and confirm the exact render. Revoking a take invalidates dependent videos. A separate **My recordings** page remains available after leaving a relationship.
+
+A leased background worker validates audio, synthesizes guide lines, and composes video with FFmpeg. The feature defaults to disabled. The included mock mode and local demo use **synthetic tones, not spoken Spanish**; real speech requires a configured Doubao account and approved voices. See [local setup and verification](docs/role-dubbing-local.md), [product design](docs/role-dubbing-product.md), and [technical design](docs/role-dubbing-technical.md).
+
 ## Full-stack architecture
 
 | Layer | Technology and role |
@@ -121,6 +129,8 @@ POST /api/achievements/bootstrap   GET  /api/achievements/tasks
 POST /api/pipeline/script          POST /api/pipeline/image
 POST /api/pipeline/video/start     GET  /api/pipeline/jobs/[id]
 GET  /api/rehearsal                POST /api/rehearsal/sos
+GET  /api/dubbing                  POST /api/dubbing
+POST /api/dubbing/takes            DELETE /api/dubbing/takes?id=...
 ```
 
 ## Repository structure
@@ -160,7 +170,7 @@ AI providers are optional for parts of the interface. The documented mock modes 
 
 ## Validation
 
-The showcase passed **100 automated tests**, ESLint, and a complete Next.js production build on **2026-10-08**, including TypeScript checking and static-page generation. Image-route tests cover persisted script reuse, failed-stage retry, replay, access denial, and concurrent claims using mocked authentication, database responses, and media providers; they do not validate live Supabase policies or paid media generation.
+The showcase passed **366 automated tests**, ESLint, and a complete Next.js production build on **2026-10-08**, including TypeScript checking and static-page generation. This run included the FFmpeg media smoke tests and 27 PGlite PostgreSQL migration/RPC tests. Coverage includes saved-script reuse, failed-stage retry, lease fencing, private recordings, manifest consent, revocation, and cleanup. Browser checks use a synthetic input stream and fixture API; hosted Supabase concurrency, real microphone behavior, and paid speech generation remain unverified.
 
 Before deployment, run:
 
@@ -186,6 +196,7 @@ The repository also includes `scripts/verify-supabase-image-upload.mjs` for vali
 - Live media generation depends on external provider availability, quotas, and asynchronous polling.
 - The Python LangGraph module is a research prototype alongside the integrated Next.js pipeline, not a separately deployed production service.
 - Personalized generation can still be inconsistent; structured output validation and user review remain necessary.
-- Production use would require broader automated tests, monitoring, deletion workflows, and a complete privacy review.
+- Role dubbing needs the database migration and a separate FFmpeg worker before activation. Hosted storage policies, real microphone compatibility, and live Spanish speech still require deployment checks.
+- Production use would require monitoring, operational cleanup alerts, and a complete privacy review.
 
 **Note:** This project was initially developed locally. The Git repository was created when the codebase was prepared for publication, so the early development history is unavailable. Subsequent updates are tracked in this repository.

@@ -2,9 +2,14 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { DubbingStudio, type DubbingPlayback } from "@/components/learning/dubbing/DubbingStudio";
+import { DubbingAuthBoundary } from "@/components/learning/dubbing/DubbingAuthBoundary";
+import { RefreshingVideo } from "@/components/learning/dubbing/RefreshingMedia";
+import { runGuardedNavigation } from "@/components/learning/dubbing/studioClient";
 import {
   Dialog,
   DialogContent,
@@ -80,6 +85,70 @@ const POLL_INTERVAL_MS = 2_000;
 const POLL_MAX_ATTEMPTS = 300;
 const HISTORY_REFRESH_MS = 15_000;
 
+type RehearsalCinemaProps = {
+  pipelineJobId?: string;
+  videoUrl: string | null;
+  poster?: string;
+  playing?: boolean;
+  playProgress?: number;
+  onDemoPlay?: () => void;
+  onBack: () => void;
+  onHelp: () => void;
+  onVocabulary: () => void;
+};
+
+/** The player and recording workspace share one authenticated lifetime. */
+export function RehearsalCinema({
+  pipelineJobId, videoUrl, poster, playing = false, playProgress = 0,
+  onDemoPlay, onBack, onHelp, onVocabulary,
+}: RehearsalCinemaProps) {
+  const [playback, setPlayback] = useState<DubbingPlayback | null>(null);
+  const sourceVideoRef = useRef<HTMLVideoElement>(null);
+  const leaveGuard = useRef<(() => boolean) | null>(null);
+  const updateLeaveGuard = useCallback((guard: (() => boolean) | null) => { leaveGuard.current = guard; }, []);
+  const leave = (action: () => void) => runGuardedNavigation(leaveGuard.current, action);
+  const selectedUrl = playback?.url ?? videoUrl;
+  const pauseTheater = useCallback(() => sourceVideoRef.current?.pause(), []);
+
+  return <div className="grid min-h-[calc(100dvh-3.5rem)] lg:grid-cols-2">
+    <section aria-label="排练放映厅" className="relative isolate min-h-[62vh] overflow-hidden bg-black lg:sticky lg:top-0 lg:h-[calc(100dvh-3.5rem)] lg:min-h-[38rem]">
+      <Image src={THEATER_IMG} alt="" fill className="-z-20 object-cover object-center" sizes="(max-width: 1024px) 100vw, 50vw" priority />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/70 via-transparent to-black/80" />
+      <div className="absolute inset-x-4 top-5 text-center">
+        <p className="text-sm font-medium tracking-[0.16em] text-amber-100">未来排练室</p>
+        <p className="mt-1 text-xs text-white/70">{playback?.label ?? (videoUrl ? "原始画面 · 选择右侧示范或成片开始放映" : "放映界面演示")}</p>
+        {playback?.synthetic ? <p className="mt-1 text-[11px] text-amber-200">测试提示音 · 非西语发音示范</p> : null}
+      </div>
+      <div className="absolute inset-x-[5%] top-[17%] aspect-video overflow-hidden rounded-lg border border-white/20 bg-black/75 shadow-2xl shadow-black/60">
+        {selectedUrl ? <RefreshingVideo key={playback?.id ?? "source"} src={selectedUrl} subtitleUrl={playback?.subtitleUrl} videoRef={sourceVideoRef} poster={poster} className="h-full w-full bg-black object-contain" /> : (
+          <button type="button" aria-label="播放界面演示" onClick={onDemoPlay} className="flex h-full w-full flex-col items-center justify-center gap-3 px-4 text-white">
+            {!playing ? <><span className="rounded-full bg-white/10 p-4 ring-1 ring-amber-200/40"><svg className="h-8 w-8 text-amber-100" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M8 5v14l11-7z" /></svg></span><span className="text-sm">点击体验放映界面</span><span className="text-xs text-white/55">没有真实视频，不会录音或生成配音</span></> : <><span className="text-sm text-amber-100">演示放映中…</span><span className="h-1.5 w-48 overflow-hidden rounded-full bg-white/15"><span className="block h-full rounded-full bg-amber-300 transition-[width] duration-100" style={{ width: `${playProgress * 100}%` }} /></span></>}
+          </button>
+        )}
+      </div>
+      <div className="absolute inset-x-4 bottom-6 space-y-3 text-center">
+        <p className="text-[11px] text-white/70">{pipelineJobId ? "你的声音，只在你确认之后加入成片。" : "生成真实视频后，在这里听示范、分角色配音。"}</p>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button type="button" size="sm" variant="outline" className="border-white/25 bg-black/30 text-white hover:bg-white/10" onClick={() => leave(onBack)}>返回新建</Button>
+          <Button type="button" size="sm" className="pj-btn-gradient" onClick={() => { pauseTheater(); onHelp(); }}>朗读帮助</Button>
+          <Button type="button" size="sm" variant="outline" className="border-white/25 bg-black/30 text-white hover:bg-white/10" onClick={() => leave(onVocabulary)}>词汇卡</Button>
+          <Link href="/recordings" onClick={(event) => { if (leaveGuard.current?.() === false) event.preventDefault(); }} className="px-2 py-2 text-xs text-white/75 underline underline-offset-4 hover:text-white">我的录音</Link>
+        </div>
+      </div>
+    </section>
+    <aside aria-label="角色配音操作区" className="min-w-0 border-t border-white/10 bg-[#0f172a] lg:max-h-[calc(100dvh-3.5rem)] lg:min-h-[38rem] lg:overflow-y-auto lg:border-l lg:border-t-0">
+      {pipelineJobId && videoUrl ? <DubbingStudio pipelineJobId={pipelineJobId} presentation="theater" onPlaybackChange={setPlayback} onRecordStart={pauseTheater} onLeaveGuardChange={updateLeaveGuard} /> : <div className="flex min-h-[30rem] flex-col items-center justify-center gap-5 p-8 text-center text-slate-100">
+        <p className="text-[11px] uppercase tracking-[0.18em] text-amber-200/75">Puppy rehearsal</p>
+        <h2 className="text-xl font-semibold">让小狗说出你的声音</h2>
+        <p className="max-w-xs text-sm leading-7 text-slate-300">先生成一段旅行视频，再听西语示范、录制自己角色的台词，最后和对方一起完成配音。</p>
+        <div className="relative aspect-square w-48 overflow-hidden rounded-3xl bg-white"><Image src={DOG_CYCLE[0]} alt="黄狗和白狗一起看电影" fill className="object-cover" sizes="12rem" /></div>
+        <Button type="button" className="pj-btn-gradient" onClick={onBack}>返回生成旅行视频</Button>
+        <p className="text-xs text-slate-400">当前仅演示界面，不会申请麦克风权限。</p>
+      </div>}
+    </aside>
+  </div>;
+}
+
 export function RehearsalTheaterView() {
   const userId = useAppStore((s: AppState) => s.currentUserRole);
   const [latestTravelLog, setLatestTravelLog] = useState<TravelLog | null>(null);
@@ -104,6 +173,7 @@ export function RehearsalTheaterView() {
   const [script, setScript] = useState<LessonScript | null>(null);
   const [keyImageUrl, setKeyImageUrl] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [activePipelineJobId, setActivePipelineJobId] = useState<string | null>(null);
   const [rehearsalHistory, setRehearsalHistory] = useState<RehearsalHistoryRun[]>([]);
   const [historyNowMs, setHistoryNowMs] = useState(() => Date.now());
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -330,6 +400,7 @@ export function RehearsalTheaterView() {
     setPipelineError(null);
     setPipelineLoading(true);
     setVideoUrl(null);
+    setActivePipelineJobId(null);
     try {
       if (resumeSavedRequest && !lastScriptRequestRef.current) {
         throw new Error("没有可恢复的排练任务，请重新开始");
@@ -435,6 +506,7 @@ export function RehearsalTheaterView() {
         vidJson.status === "completed" ? vidJson.videoUrl : undefined,
       );
       setVideoUrl(finalUrl);
+      setActivePipelineJobId(pipelineJobId);
       changePhase("cinema");
       setCanResumePipeline(false);
       void refreshRehearsalHistory();
@@ -482,6 +554,7 @@ export function RehearsalTheaterView() {
     setVideoUrl(null);
     setKeyImageUrl(null);
     setScript(null);
+    setActivePipelineJobId(null);
     setPipelineError(null);
     setCanResumePipeline(false);
     lastScriptRequestRef.current = null;
@@ -492,6 +565,7 @@ export function RehearsalTheaterView() {
     setScript(run.script);
     setKeyImageUrl(run.keyImageUrl ?? run.thumbnailUrl);
     setVideoUrl(run.videoUrl);
+    setActivePipelineJobId(run.id);
     setPipelineError(null);
     setCanResumePipeline(false);
     changePhase("cinema");
@@ -553,6 +627,7 @@ export function RehearsalTheaterView() {
         videoPayload.status === "completed" ? videoPayload.videoUrl : undefined,
       );
       setVideoUrl(finalUrl);
+      setActivePipelineJobId(run.id);
       changePhase("cinema");
       await refreshRehearsalHistory();
     } catch (error) {
@@ -602,6 +677,7 @@ export function RehearsalTheaterView() {
         payload.status === "completed" ? payload.videoUrl : undefined,
       );
       setVideoUrl(finalUrl);
+      setActivePipelineJobId(run.id);
       changePhase("cinema");
       await refreshRehearsalHistory();
     } catch (error) {
@@ -850,7 +926,7 @@ export function RehearsalTheaterView() {
                               className="h-7 border-amber-300/30 px-2 text-[10px] text-amber-100"
                               onClick={() => openHistoricalRun(run)}
                             >
-                              打开放映
+                              放映与配音
                             </Button>
                           ) : canResumeVideoPolling(run) ? (
                             <Button
@@ -966,75 +1042,29 @@ export function RehearsalTheaterView() {
       ) : null}
 
       {phase === "cinema" ? (
-        <div className="relative flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col bg-black lg:flex-row">
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 p-4 lg:p-8">
-            <div className="w-full max-w-5xl">
-              <div
-                className="relative aspect-video w-full overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/10"
-                onClick={() => {
-                  if (!videoUrl && !playing && playProgress === 0) setPlaying(true);
-                }}
-              >
-                {videoUrl ? (
-                  <video
-                    src={videoUrl}
-                    controls
-                    playsInline
-                    className="h-full w-full bg-black object-contain"
-                    poster={keyImageUrl ?? undefined}
-                  >
-                    您的浏览器不支持视频标签
-                  </video>
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 to-black">
-                    {!playing ? (
-                      <>
-                        <div className="mb-2 rounded-full bg-white/10 p-5 ring-2 ring-amber-300/40">
-                          <svg className="h-14 w-14 text-amber-200" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
-                        </div>
-                        <p className="text-sm text-white/70">点击画面开始演示播放（无真实视频）</p>
-                        <p className="mt-1 text-xs text-white/45">播放结束后自动展示单词卡片</p>
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2">
-                        <p className="text-sm font-medium text-amber-100/90">放映中…（演示）</p>
-                        <div className="h-1.5 w-48 overflow-hidden rounded-full bg-white/15">
-                          <div
-                            className="h-full rounded-full bg-amber-400/90 transition-[width] duration-100 ease-linear"
-                            style={{ width: `${playProgress * 100}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="border-white/25 bg-white/5 text-white hover:bg-white/10"
-              onClick={resetDemo}
-            >
-              返回双栏等待页
-            </Button>
-          </div>
-
-          <aside className="flex flex-row items-center justify-center gap-3 border-t border-white/10 bg-zinc-950/90 p-4 lg:w-36 lg:flex-col lg:border-l lg:border-t-0 lg:py-10">
-            <Button
-              type="button"
-              className="whitespace-nowrap pj-btn-gradient shadow-lg shadow-amber-900/30"
-              onClick={() => {
-                setSosText(null);
-                setHelpOpen(true);
-              }}
-            >
-              帮助小狗
-            </Button>
-            <p className="max-w-[10rem] text-center text-[10px] leading-snug text-white/45">Agent 7 · 卡壳朗读指导</p>
-          </aside>
+        <div className="min-h-[calc(100dvh-3.5rem)] flex-1 bg-[#0f172a]">
+          {videoUrl && activePipelineJobId ? (
+            <DubbingAuthBoundary presentation="theater">
+              {(authUserId) => <RehearsalCinema
+                key={`${authUserId}:${activePipelineJobId}`}
+                pipelineJobId={activePipelineJobId}
+                videoUrl={videoUrl}
+                poster={keyImageUrl ?? undefined}
+                onBack={resetDemo}
+                onHelp={() => { setSosText(null); setHelpOpen(true); }}
+                onVocabulary={() => changePhase("vocab")}
+              />}
+            </DubbingAuthBoundary>
+          ) : <RehearsalCinema
+            videoUrl={videoUrl}
+            poster={keyImageUrl ?? undefined}
+            playing={playing}
+            playProgress={playProgress}
+            onDemoPlay={() => { if (!playing && playProgress === 0) setPlaying(true); }}
+            onBack={resetDemo}
+            onHelp={() => { setSosText(null); setHelpOpen(true); }}
+            onVocabulary={() => changePhase("vocab")}
+          />}
 
           <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
             <DialogContent className="sm:max-w-md">
