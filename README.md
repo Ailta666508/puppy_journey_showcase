@@ -84,7 +84,7 @@ The LLM access layer is separated from graph state and business logic, allowing 
 
 Script creation accepts an `idempotency_key` and returns the persisted run state on repeated requests. A client can resend the same payload with `retry_failed: true` after a failed script attempt or after a script request has remained interrupted for three minutes. The route uses an optimistic claim on the stored update timestamp, preserves the completed context stage, increments the script attempt, and prevents concurrent recovery requests from dispatching duplicate model calls.
 
-Key-frame generation now participates in the same persisted state machine. The image route claims the `image` stage by update timestamp, records completion before opening the `video` stage, replays an existing key frame without another provider call, and retries only a recorded failed image attempt.
+Key-frame generation now participates in the same persisted state machine. The image route reads the saved script from the authorized run, so initial generation and retries use the same input as the video stage. Clients submit only the run ID; legacy client-supplied scripts are ignored. The route claims the `image` stage by update timestamp, records completion before opening the `video` stage, replays an existing key frame without another provider call, and retries only a recorded failed image attempt.
 
 Video generation continues that persisted lifecycle. The server uses the saved script and generated key frame rather than trusting client-supplied media inputs, atomically claims each submission, reuses an in-flight provider task, recovers interrupted submissions, and retries only failed video stages. Authenticated polling records provider failure or completion in the same run state; a completed video also unlocks the script-derived learning cards. Pronunciation assistance is protected by the same couple-workspace authorization boundary.
 
@@ -160,12 +160,13 @@ AI providers are optional for parts of the interface. The documented mock modes 
 
 ## Validation
 
-The curated showcase passed **29 unit tests**, ESLint, and a complete Next.js production build on **2026-09-15**, including TypeScript checking and static-page generation.
+The showcase passed **100 automated tests**, ESLint, and a complete Next.js production build on **2026-10-08**, including TypeScript checking and static-page generation. Image-route tests cover persisted script reuse, failed-stage retry, replay, access denial, and concurrent claims using mocked authentication, database responses, and media providers; they do not validate live Supabase policies or paid media generation.
 
 Before deployment, run:
 
 ```bash
 cd puppy-journey
+pnpm test
 pnpm lint
 pnpm build
 ```

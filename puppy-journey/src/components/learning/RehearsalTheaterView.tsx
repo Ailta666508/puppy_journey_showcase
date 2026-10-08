@@ -402,7 +402,7 @@ export function RehearsalTheaterView() {
       const imgRes = await fetch("/api/pipeline/image", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...apiHeaders },
-        body: JSON.stringify({ pipeline_job_id: pipelineJobId, script: sc }),
+        body: JSON.stringify({ pipeline_job_id: pipelineJobId }),
       });
       const imgJson = (await imgRes.json()) as { ok?: boolean; error?: string; imageUrl?: string };
       if (!imgRes.ok || !imgJson.ok || !imgJson.imageUrl) {
@@ -517,7 +517,7 @@ export function RehearsalTheaterView() {
         const imageResponse = await fetch("/api/pipeline/image", {
           method: "POST",
           headers: { "Content-Type": "application/json", ...apiHeaders },
-          body: JSON.stringify({ pipeline_job_id: run.id, script: run.script }),
+          body: JSON.stringify({ pipeline_job_id: run.id }),
         });
         const imagePayload = await imageResponse.json() as {
           ok?: boolean;

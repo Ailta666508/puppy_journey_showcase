@@ -22,7 +22,11 @@ export const maxDuration = 120;
 function isLessonScript(x: unknown): x is LessonScript {
   if (!x || typeof x !== "object" || Array.isArray(x)) return false;
   const o = x as Record<string, unknown>;
-  return typeof o.scene === "string" && typeof o.theme === "string" && Array.isArray(o.script);
+  return (
+    typeof o.scene === "string" && o.scene.trim().length > 0 &&
+    typeof o.theme === "string" && o.theme.trim().length > 0 &&
+    Array.isArray(o.script) && o.script.length > 0
+  );
 }
 
 export async function POST(req: Request) {
@@ -37,16 +41,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "缺少合法 pipeline_job_id" }, { status: 400 });
     }
 
-    const script = body.script;
-    if (!isLessonScript(script)) {
-      return NextResponse.json({ ok: false, error: "请提供合法 script 对象" }, { status: 400 });
-    }
-
     const { supabase, coupleId, userId } = ctx;
     const { data: row, error: fetchErr } = await supabase
       .from("rehearsal_pipeline_jobs")
       .select(
-        "id, author_id, couple_id, run_state, key_image_url, created_at, updated_at",
+        "id, author_id, couple_id, script_json, run_state, key_image_url, created_at, updated_at",
       )
       .eq("id", pipelineJobId)
       .maybeSingle();
@@ -75,6 +74,17 @@ export async function POST(req: Request) {
         run: previousRun,
         replayed: true,
       });
+    }
+
+    // The saved script is the input snapshot for this run, including retries.
+    // Ignore legacy client script fields so a resumed image cannot drift from
+    // the script used by video generation and the learning cards.
+    const script = row.script_json;
+    if (!isLessonScript(script)) {
+      return NextResponse.json(
+        { ok: false, error: "已保存的任务缺少合法剧本" },
+        { status: 409 },
+      );
     }
 
     const startedAt = new Date().toISOString();
