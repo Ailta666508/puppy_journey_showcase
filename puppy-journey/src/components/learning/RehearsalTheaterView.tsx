@@ -33,6 +33,7 @@ import {
   msUntilInterruptedImageRecovery,
   msUntilInterruptedVideoRecovery,
   parseRehearsalHistoryPage,
+  rehearsalStageTimeline,
   retryableFailedStage,
   selectRehearsalHistory,
   type RehearsalHistoryFilter,
@@ -181,6 +182,7 @@ export function RehearsalTheaterView() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRetryId, setHistoryRetryId] = useState<string | null>(null);
+  const [historyDetailRun, setHistoryDetailRun] = useState<RehearsalHistoryRun | null>(null);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoadingOlder, setHistoryLoadingOlder] = useState(false);
   const [historyQuery, setHistoryQuery] = useState("");
@@ -904,6 +906,29 @@ export function RehearsalTheaterView() {
                     {transcriptScript && transcriptLines(transcriptScript).length === 0 ? <p>暂无可用台词。</p> : null}
                   </DialogContent>
                 </Dialog>
+                <Dialog open={historyDetailRun !== null} onOpenChange={(open) => { if (!open) setHistoryDetailRun(null); }}>
+                  <DialogContent className="max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>排练阶段详情</DialogTitle>
+                      <DialogDescription>{historyDetailRun?.userText || "未命名排练"}</DialogDescription>
+                    </DialogHeader>
+                    <ol className="space-y-2">
+                      {historyDetailRun ? rehearsalStageTimeline(historyDetailRun).map((entry) => (
+                        <li key={entry.stage ?? "legacy"} className="rounded border p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium">{entry.label}</span>
+                            <span className="text-xs text-muted-foreground">{entry.status}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {entry.attempt !== null ? `尝试 ${entry.attempt}` : "旧版记录"}
+                            {entry.timestamp ? ` · ${new Date(entry.timestamp).toLocaleString("zh-CN")}` : ""}
+                          </p>
+                          {entry.error ? <p role="alert" className="mt-1 text-sm text-red-500">{entry.error}</p> : null}
+                        </li>
+                      )) : null}
+                    </ol>
+                  </DialogContent>
+                </Dialog>
                 <div className="rounded-lg border border-white/10 bg-black/25 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
                     <label className="text-xs font-medium text-amber-100/85">
@@ -990,6 +1015,11 @@ export function RehearsalTheaterView() {
                               </p>
                             ) : null}
                           </div>
+                          <Button type="button" size="sm" variant="ghost"
+                            className="h-7 px-2 text-[10px]"
+                            onClick={() => setHistoryDetailRun(run)}>
+                            阶段详情
+                          </Button>
                           {run.script ? (
                             <Button type="button" size="sm" variant="outline"
                               className="h-7 px-2 text-[10px]"

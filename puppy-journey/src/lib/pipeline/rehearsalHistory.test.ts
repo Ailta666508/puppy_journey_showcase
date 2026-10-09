@@ -10,6 +10,7 @@ import {
   msUntilInterruptedVideoRecovery,
   parseRehearsalHistoryResponse,
   parseRehearsalHistoryPage,
+  rehearsalStageTimeline,
   retryableFailedStage,
   selectRehearsalHistory,
   summarizeRehearsalFailure,
@@ -25,6 +26,30 @@ const SCRIPT = {
 } as const;
 
 describe("parseRehearsalHistoryResponse", () => {
+  it("builds an ordered persisted stage timeline with attempts and errors", () => {
+    const run = {
+      id: "timeline",
+      status: "failed",
+      updatedAt: "2026-10-09T00:00:00.000Z",
+      error: "job failed",
+      runState: { stages: {
+        context: { status: "completed", attempt: 1, completedAt: "2026-10-09T00:00:01.000Z" },
+        script: { status: "failed", attempt: 2, startedAt: "2026-10-09T00:00:02.000Z", error: "schema mismatch" },
+      } },
+    } as unknown as RehearsalHistoryRun;
+    const timeline = rehearsalStageTimeline(run);
+    expect(timeline).toHaveLength(5);
+    expect(timeline[0]).toMatchObject({ stage: "context", status: "completed", attempt: 1 });
+    expect(timeline[1]).toMatchObject({ stage: "script", status: "failed", attempt: 2, error: "schema mismatch" });
+    expect(timeline[2]).toMatchObject({ stage: "image", status: "pending", attempt: 0 });
+  });
+
+  it("keeps legacy jobs observable without invented stage state", () => {
+    const run = { id: "legacy", status: "processing", updatedAt: "now", error: null } as RehearsalHistoryRun;
+    expect(rehearsalStageTimeline(run)).toEqual([expect.objectContaining({
+      stage: null, label: "运行记录", status: "processing", timestamp: "now",
+    })]);
+  });
   it("parses pagination metadata and appends older runs without duplicates", () => {
     const first = parseRehearsalHistoryPage({
       runs: [{ id: "run-1", status: "completed", updatedAt: "", createdAt: "" }],

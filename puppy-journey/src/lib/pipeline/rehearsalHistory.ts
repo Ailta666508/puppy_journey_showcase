@@ -38,6 +38,15 @@ export type RehearsalFailureSummary = {
   message: string;
 };
 
+export type RehearsalStageTimelineEntry = {
+  stage: RehearsalStage | null;
+  label: string;
+  status: string;
+  attempt: number | null;
+  timestamp: string | null;
+  error: string | null;
+};
+
 const STAGE_LABELS: Record<RehearsalStage, string> = {
   context: "整理上下文",
   script: "生成剧本",
@@ -295,6 +304,31 @@ export function summarizeRehearsalFailure(
     attempt: stageState?.attempt ?? null,
     message,
   };
+}
+
+export function rehearsalStageTimeline(run: RehearsalHistoryRun): RehearsalStageTimelineEntry[] {
+  const stages = run.runState?.stages;
+  if (!stages) {
+    return [{
+      stage: null,
+      label: "运行记录",
+      status: run.status,
+      attempt: null,
+      timestamp: run.updatedAt || null,
+      error: run.error,
+    }];
+  }
+  return REHEARSAL_STAGES.map((stage) => {
+    const state = stages[stage];
+    return {
+      stage,
+      label: STAGE_LABELS[stage],
+      status: state?.status ?? "pending",
+      attempt: state?.attempt ?? 0,
+      timestamp: state?.completedAt ?? state?.startedAt ?? null,
+      error: optionalString(state?.error),
+    };
+  });
 }
 
 

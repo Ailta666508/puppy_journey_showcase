@@ -212,3 +212,7 @@ validated cursor. Pagination uses immutable creation time plus job ID as a
 stable tie-break, requests one look-ahead row, and retains couple-scoped database
 filtering. The theater appends unique older runs without exposing cursor fields
 or provider identifiers to the learner.
+
+Each saved run now exposes an ordered stage detail view with persisted status,
+attempt count, timestamps, and stage-local errors. Legacy jobs remain visible as
+a single run-level entry instead of showing invented stage progress.
