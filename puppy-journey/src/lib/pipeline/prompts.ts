@@ -12,9 +12,12 @@ export const MERGED_SCRIPT_SYSTEM = `你是「Agent 1」西语学习管线编剧
 【输出要求】
 - 只输出一个 JSON 对象，不要 Markdown 代码围栏，不要多余说明文字。
 - 顶层字段必须包含：scene（字符串）、theme（字符串）、script（数组）。
-- script 数组内每一项必须包含：id（数字）、type（仅 "npc" 或 "player"）、character（字符串）、text（西语台词）、translation（中文翻译）、startTime、endTime（数字，单位秒）。
+- script 数组内每一项必须包含：id（唯一非负整数）、type（仅 "npc" 或 "player"）、character（字符串）、speakerKey、dubbable（布尔值）、text（西语台词）、translation（中文翻译）、startTime、endTime（数字，单位秒）。
 - startTime/endTime 是「该句对白在成片里的大致起止时间」，须单调递增、互不重叠；**全片最后一行的 endTime 应接近 8.0**（与下游约 8 秒视频一致）。句与句之间至少留 **0.5～1.0 秒** 停顿。语速按**慢读、零基础能跟读**估算：短句单行时长一般 **不少于约 2.2 秒**，长句按词数加长，**不要为了塞满内容而把时间轴压得太紧**。
 - NPC 与两只小狗（白狗、黄狗）对白清晰；player 行的 character 须明确写「白狗」或「黄狗」。
+- 白狗使用 speakerKey="white_dog"，黄狗使用 speakerKey="yellow_dog"；两者均为 type="player"、dubbable=true，各至少一句能独立跟读的完整短句，优先使用 3～6 个西语词。先控制台词长度，不以压缩语速塞入长句。
+- NPC 使用 type="npc"、dubbable=false；speakerKey 为 "npc:" 加稳定英文编号，例如 "npc:waiter"。同一 NPC 始终使用同一个编号，不同 NPC 不共用编号。编号部分仅小写字母、数字、连字符或下划线，以字母开头，最多 32 字符。
+- 角色分配只描述剧本人物，不输出任何用户账号、couple ID 或录音访问权限。每句西语最多 180 字符，全剧本最多 12 句、1200 个西语字符；约 8 秒的场景应明显短于这些安全上限。
 - 可选字段 level：beginner | intermediate | advanced，缺省视为 beginner。
 - 可选字段 visualPromptHint：供后续生图的一句画面提示，可省略。
 
@@ -30,8 +33,10 @@ export const SCRIPT_JSON_CANONICAL_EXAMPLE = `{
       "id": 1,
       "type": "npc",
       "character": "服务员",
-      "text": "¡Hola! ¿Qué van a tomar?",
-      "translation": "你好！你们要喝点什么？",
+      "speakerKey": "npc:waiter",
+      "dubbable": false,
+      "text": "¡Hola!",
+      "translation": "你好！",
       "startTime": 0.0,
       "endTime": 2.8
     },
@@ -39,8 +44,10 @@ export const SCRIPT_JSON_CANONICAL_EXAMPLE = `{
       "id": 2,
       "type": "player",
       "character": "白狗",
-      "text": "Un café con leche, por favor.",
-      "translation": "请给我一杯拿铁。",
+      "speakerKey": "white_dog",
+      "dubbable": true,
+      "text": "Un café, por favor.",
+      "translation": "请给我一杯咖啡。",
       "startTime": 3.4,
       "endTime": 5.9
     },
@@ -48,8 +55,10 @@ export const SCRIPT_JSON_CANONICAL_EXAMPLE = `{
       "id": 3,
       "type": "player",
       "character": "黄狗",
-      "text": "Y un cortado para mí, gracias.",
-      "translation": "我要一杯可塔朵，谢谢。",
+      "speakerKey": "yellow_dog",
+      "dubbable": true,
+      "text": "Un té, gracias.",
+      "translation": "一杯茶，谢谢。",
       "startTime": 6.5,
       "endTime": 8.0
     }

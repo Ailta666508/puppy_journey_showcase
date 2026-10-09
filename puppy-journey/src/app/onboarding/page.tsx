@@ -411,6 +411,9 @@ export default function OnboardingPage() {
         <Link href="/" className={buttonVariants({ variant: "ghost", size: "sm" })}>
           返回首页
         </Link>
+        <Link href="/recordings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          管理我的录音
+        </Link>
       </div>
     </div>
   );

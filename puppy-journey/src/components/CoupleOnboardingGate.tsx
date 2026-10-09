@@ -7,7 +7,7 @@ import { applyCoupleMeToStore } from "@/lib/syncViewerRole";
 import { getSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { ensureAnonymousSession } from "@/lib/supabase/ensureAnonymousSession";
 
-const SKIP_PREFIXES = ["/onboarding"];
+const SKIP_PREFIXES = ["/onboarding", "/recordings"];
 
 /**
  * 自动匿名登录（无需邮箱），情侣空间未凑齐时除引导页外一律进入 /onboarding。

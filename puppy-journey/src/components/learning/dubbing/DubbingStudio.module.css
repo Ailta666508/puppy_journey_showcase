@@ -1,0 +1,47 @@
+.theater {
+  color: #f1f5f9;
+  background: #0f172a;
+  color-scheme: dark;
+}
+
+.theater [class~="bg-white"],
+.theater [class~="bg-[#fffafa]"] { background-color: #18243a; }
+.theater [class~="bg-rose-50"] { background-color: #2c2439; }
+.theater [class~="bg-rose-100"] { background-color: #493044; }
+.theater [class~="bg-stone-100"] { background-color: #27344a; }
+.theater [class~="bg-amber-50"] { background-color: #302b20; }
+.theater [class~="border-rose-100"],
+.theater [class~="border-rose-200"] { border-color: #354159; }
+.theater [class~="border-amber-200"] { border-color: #75613b; }
+.theater [class~="text-stone-500"] { color: #a9b5c8; }
+.theater [class~="text-stone-600"] { color: #c5cede; }
+.theater [class~="text-stone-700"],
+.theater [class~="text-stone-800"] { color: #f1f5f9; }
+.theater [class~="text-rose-700"],
+.theater [class~="text-rose-800"] { color: #ffb0c1; }
+.theater [class~="text-emerald-800"] { color: #8ce0bd; }
+.theater [class~="text-amber-800"],
+.theater [class~="text-amber-900"],
+.theater [class~="text-amber-950"] { color: #ead8a3; }
+.theater [class~="bg-rose-500"],
+.theater [class~="!bg-rose-500"] {
+  background-image: linear-gradient(90deg, #ff6b88 0%, #ff7aa0 35%, #ff8a7a 100%);
+  color: white;
+  border-color: transparent;
+}
+.theater button:not(:disabled):hover { filter: brightness(1.08); }
+.theater select, .theater input[type="number"] {
+  background: #101a2e;
+  border-color: #47536a;
+  color: #f1f5f9;
+}
+.theater button:focus-visible,
+.theater input:focus-visible,
+.theater select:focus-visible { outline: 2px solid #ff9bb0; outline-offset: 3px; }
+
+.tabs { display: flex; gap: 4px; padding: 4px; border: 1px solid #303b51; border-radius: 16px; background: #0b1323; }
+.tab, .activeTab { display: flex; flex: 1; align-items: center; justify-content: center; gap: 6px; padding: 10px 5px; border-radius: 12px; font-size: 12px; font-weight: 500; color: #b8c3d6; white-space: nowrap; }
+.activeTab { background: #2e2639; color: #ffc2cf; box-shadow: inset 0 0 0 1px #72465b; }
+.stepNumber { display: inline-flex; width: 18px; height: 18px; align-items: center; justify-content: center; border-radius: 50%; background: #253148; font-size: 10px; }
+.activeTab .stepNumber { background: #e887a2; color: #171b2a; }
+.count { font-size: 10px; color: #f1d3b0; }
