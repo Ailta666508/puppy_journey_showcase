@@ -216,3 +216,13 @@ or provider identifiers to the learner.
 Each saved run now exposes an ordered stage detail view with persisted status,
 attempt count, timestamps, and stage-local errors. Legacy jobs remain visible as
 a single run-level entry instead of showing invented stage progress.
+
+### Saved-script role practice
+
+Open **分角色练习** on a rehearsal history row, including one whose video failed.
+Choose either dialogue role, recall the Spanish line from its translation and
+preceding cue, reveal the answer, then self-rate it. At the end of the round,
+**只复习待练台词** repeats only missed lines. Restart, change role, or close the
+panel to reset the session. Missing translations have an explicit fallback;
+malformed and blank lines are excluded. This is session-local self-assessment,
+not speech recognition, automatic grading, or a persisted learning record.

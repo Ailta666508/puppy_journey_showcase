@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { RehearsalPractice } from "@/components/learning/RehearsalPractice";
 import { Button } from "@/components/ui/button";
 import { DubbingStudio, type DubbingPlayback } from "@/components/learning/dubbing/DubbingStudio";
 import { DubbingAuthBoundary } from "@/components/learning/dubbing/DubbingAuthBoundary";
@@ -207,6 +208,7 @@ export function RehearsalTheaterView() {
   }, []);
 
 
+  const [practiceScript, setPracticeScript] = useState<LessonScript | null>(null);
   const [transcriptScript, setTranscriptScript] = useState<LessonScript | null>(null);
   const [showTranslation, setShowTranslation] = useState(true);
   const [transcriptCopied, setTranscriptCopied] = useState(false);
@@ -880,6 +882,15 @@ export function RehearsalTheaterView() {
                     ) : null}
                   </div>
                 ) : null}
+                <Dialog open={practiceScript !== null} onOpenChange={(open) => { if (!open) setPracticeScript(null); }}>
+                  <DialogContent className="max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>分角色练习 · {practiceScript?.theme}</DialogTitle>
+                      <DialogDescription>{practiceScript?.scene} · 使用已保存台词，无需等待视频完成。</DialogDescription>
+                    </DialogHeader>
+                    {practiceScript ? <RehearsalPractice script={practiceScript} /> : null}
+                  </DialogContent>
+                </Dialog>
                 <Dialog open={transcriptScript !== null} onOpenChange={(open) => { if (!open) { setTranscriptScript(null); setTranscriptCopied(false); } }}>
                   <DialogContent className="max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
@@ -1027,6 +1038,10 @@ export function RehearsalTheaterView() {
                               onClick={() => { setTranscriptScript(run.script); setShowTranslation(true); }}>
                               查看剧本
                             </Button>
+                          ) : null}
+                          {run.script ? (
+                            <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]"
+                              onClick={() => setPracticeScript(run.script)}>分角色练习</Button>
                           ) : null}
                           {run.status === "completed" && run.videoUrl ? (
                             <Button
