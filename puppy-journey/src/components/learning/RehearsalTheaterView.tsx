@@ -32,6 +32,7 @@ import {
   hasActiveRehearsalRuns,
   msUntilInterruptedImageRecovery,
   msUntilInterruptedVideoRecovery,
+  nextRehearsalHistoryCursor,
   parseRehearsalHistoryPage,
   rehearsalStageTimeline,
   retryableFailedStage,
@@ -236,7 +237,7 @@ export function RehearsalTheaterView() {
       if (!response.ok) throw new Error(`排练历史请求失败 ${response.status}`);
       const page = parseRehearsalHistoryPage(payload);
       setRehearsalHistory(page.runs);
-      setHistoryCursor(page.nextCursor);
+      setHistoryCursor(nextRehearsalHistoryCursor(null, page.nextCursor));
       setHistoryNowMs(Date.now());
     } catch (error) {
       setHistoryError(getErrorMessage(error));
@@ -257,7 +258,7 @@ export function RehearsalTheaterView() {
       if (!response.ok) throw new Error(`排练历史请求失败 ${response.status}`);
       const page = parseRehearsalHistoryPage(payload);
       setRehearsalHistory((current) => appendUniqueRehearsalRuns(current, page.runs));
-      setHistoryCursor(page.nextCursor);
+      setHistoryCursor(nextRehearsalHistoryCursor(historyCursor, page.nextCursor));
     } catch (error) {
       setHistoryError(getErrorMessage(error));
     } finally {

@@ -120,6 +120,13 @@ export function appendUniqueRehearsalRuns(
   return [...current, ...older.filter((run) => !ids.has(run.id))];
 }
 
+export function nextRehearsalHistoryCursor(
+  previous: string | null,
+  next: string | null,
+): string | null {
+  return next && next !== previous ? next : null;
+}
+
 export function hasActiveRehearsalRuns(runs: RehearsalHistoryRun[]): boolean {
   return runs.some((run) => run.status === "queued" || run.status === "processing");
 }

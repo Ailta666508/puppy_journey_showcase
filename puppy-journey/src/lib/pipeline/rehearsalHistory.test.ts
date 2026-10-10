@@ -8,6 +8,7 @@ import {
   hasActiveRehearsalRuns,
   msUntilInterruptedImageRecovery,
   msUntilInterruptedVideoRecovery,
+  nextRehearsalHistoryCursor,
   parseRehearsalHistoryResponse,
   parseRehearsalHistoryPage,
   rehearsalStageTimeline,
@@ -65,6 +66,8 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(first.nextCursor).toBe("opaque-cursor");
     expect(appendUniqueRehearsalRuns(first.runs, older.runs).map((run) => run.id)).toEqual(["run-1", "run-2"]);
     expect(() => parseRehearsalHistoryPage({ runs: [], nextCursor: 3 })).toThrow("无效游标");
+    expect(nextRehearsalHistoryCursor("opaque-cursor", "opaque-cursor")).toBeNull();
+    expect(nextRehearsalHistoryCursor("opaque-cursor", "next-cursor")).toBe("next-cursor");
   });
   it("keeps playable fields from valid persisted runs", () => {
     const runs = parseRehearsalHistoryResponse({
