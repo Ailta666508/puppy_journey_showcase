@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPracticeSession, practiceCards, practiceReducer, practiceRoles, practiceSessionStorageKey, restorePracticeSession } from './rehearsalPractice';
+import { createPracticeSession, loadPersistedPracticeSession, practiceCards, practiceReducer, practiceRoles, practiceSessionStorageKey, restorePracticeSession } from './rehearsalPractice';
 import type { LessonScript } from './types';
 
 const script = {
@@ -58,5 +58,10 @@ describe('saved script role practice', () => {
     expect(restorePracticeSession(cards, '{bad json')).toEqual(createPracticeSession(cards));
     expect(restorePracticeSession([{ ...cards[0], answer: 'edited' }, ...cards.slice(1)], JSON.stringify(state))).toEqual(createPracticeSession([{ ...cards[0], answer: 'edited' }, ...cards.slice(1)]));
     expect(practiceSessionStorageKey(cards, 'Guest')).not.toBe(practiceSessionStorageKey(cards, 'Waiter'));
+  });
+
+  it('falls back to a fresh session when browser storage is unavailable', () => {
+    const cards = practiceCards(script, 'Guest');
+    expect(loadPersistedPracticeSession(cards, 'blocked')).toEqual(createPracticeSession(cards));
   });
 });

@@ -2,13 +2,13 @@
 
 import { useEffect, useReducer, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { practiceCards, practiceReducer, practiceRoles, practiceSessionStorageKey, restorePracticeSession, type PracticeCard } from '@/lib/pipeline/rehearsalPractice';
+import { clearPersistedPracticeSession, loadPersistedPracticeSession, persistPracticeSession, practiceCards, practiceReducer, practiceRoles, practiceSessionStorageKey, type PracticeCard } from '@/lib/pipeline/rehearsalPractice';
 import type { LessonScript } from '@/lib/pipeline/types';
 
 function PracticeRound({ cards, storageKey }: { cards: PracticeCard[]; storageKey: string }) {
-  const [state, dispatch] = useReducer(practiceReducer, cards, (initialCards) => restorePracticeSession(initialCards, window.localStorage.getItem(storageKey)));
+  const [state, dispatch] = useReducer(practiceReducer, cards, (initialCards) => loadPersistedPracticeSession(initialCards, storageKey));
   useEffect(() => {
-    window.localStorage.setItem(storageKey, JSON.stringify(state));
+    persistPracticeSession(state, storageKey);
   }, [state, storageKey]);
   const card = state.cards[state.index];
   if (!card) return <p>这个角色暂无可练习台词。</p>;
@@ -59,7 +59,7 @@ export function RehearsalPractice({ script }: { script: LessonScript }) {
       })()}
       <Button variant="ghost" onClick={() => {
         const cards = practiceCards(script, role);
-        window.localStorage.removeItem(practiceSessionStorageKey(cards, role));
+        clearPersistedPracticeSession(practiceSessionStorageKey(cards, role));
         setRestart((value) => value + 1);
       }}>重新练习此角色</Button>
     </div>

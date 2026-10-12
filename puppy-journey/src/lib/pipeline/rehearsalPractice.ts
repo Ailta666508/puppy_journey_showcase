@@ -64,6 +64,19 @@ export function restorePracticeSession(cards: PracticeCard[], raw: string | null
   }
 }
 
+export function loadPersistedPracticeSession(cards: PracticeCard[], key: string): PracticeSession {
+  try { return restorePracticeSession(cards, window.localStorage.getItem(key)); }
+  catch { return createPracticeSession(cards); }
+}
+
+export function persistPracticeSession(state: PracticeSession, key: string): void {
+  try { window.localStorage.setItem(key, JSON.stringify(state)); } catch { /* storage may be disabled or full */ }
+}
+
+export function clearPersistedPracticeSession(key: string): void {
+  try { window.localStorage.removeItem(key); } catch { /* best-effort cleanup */ }
+}
+
 export type PracticeAction = { type: 'reveal' } | { type: 'grade'; remembered: boolean } | { type: 'review' };
 export function practiceReducer(state: PracticeSession, action: PracticeAction): PracticeSession {
   if (action.type === 'review') {
