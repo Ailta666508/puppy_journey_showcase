@@ -1,12 +1,15 @@
 "use client";
 
-import { useReducer, useState } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { createPracticeSession, practiceCards, practiceReducer, practiceRoles, type PracticeCard } from '@/lib/pipeline/rehearsalPractice';
+import { practiceCards, practiceReducer, practiceRoles, practiceSessionStorageKey, restorePracticeSession, type PracticeCard } from '@/lib/pipeline/rehearsalPractice';
 import type { LessonScript } from '@/lib/pipeline/types';
 
-function PracticeRound({ cards }: { cards: PracticeCard[] }) {
-  const [state, dispatch] = useReducer(practiceReducer, cards, createPracticeSession);
+function PracticeRound({ cards, storageKey }: { cards: PracticeCard[]; storageKey: string }) {
+  const [state, dispatch] = useReducer(practiceReducer, cards, (initialCards) => restorePracticeSession(initialCards, window.localStorage.getItem(storageKey)));
+  useEffect(() => {
+    window.localStorage.setItem(storageKey, JSON.stringify(state));
+  }, [state, storageKey]);
   const card = state.cards[state.index];
   if (!card) return <p>这个角色暂无可练习台词。</p>;
   if (state.completed) return (
@@ -14,7 +17,7 @@ function PracticeRound({ cards }: { cards: PracticeCard[] }) {
       <p>第 {state.round} 轮完成：{state.cards.length - state.review.length}/{state.cards.length} 句自评已掌握。</p>
       {state.review.length ? <Button onClick={() => dispatch({ type: 'review' })}>只复习待练台词（{state.review.length}）</Button>
         : <p>本轮全部掌握！可以换一个角色继续。</p>}
-      <p className="text-sm text-muted-foreground">进度仅保留在本次打开的练习中；自评不代表自动语言评分。</p>
+      <p className="text-sm text-muted-foreground">进度会保存在此设备；自评不代表自动语言评分。</p>
     </section>
   );
   return (
@@ -48,9 +51,17 @@ export function RehearsalPractice({ script }: { script: LessonScript }) {
           {roles.map((name) => <option key={name} value={name}>{name}</option>)}
         </select>
       </label>
-      <p className="text-sm text-muted-foreground">看提示回忆台词，揭晓后自评。切换角色或关闭弹窗会重置练习。</p>
-      <PracticeRound key={`${role}:${restart}`} cards={practiceCards(script, role)} />
-      <Button variant="ghost" onClick={() => setRestart((value) => value + 1)}>重新练习此角色</Button>
+      <p className="text-sm text-muted-foreground">看提示回忆台词，揭晓后自评。关闭后可从此设备继续，重新练习会清除本角色进度。</p>
+      {(() => {
+        const cards = practiceCards(script, role);
+        const storageKey = practiceSessionStorageKey(cards, role);
+        return <PracticeRound key={`${storageKey}:${restart}`} cards={cards} storageKey={storageKey} />;
+      })()}
+      <Button variant="ghost" onClick={() => {
+        const cards = practiceCards(script, role);
+        window.localStorage.removeItem(practiceSessionStorageKey(cards, role));
+        setRestart((value) => value + 1);
+      }}>重新练习此角色</Button>
     </div>
   );
 }

@@ -37,6 +37,33 @@ export function createPracticeSession(cards: PracticeCard[], round = 1): Practic
   return { cards, index: 0, revealed: false, review: [], completed: cards.length === 0, round };
 }
 
+/** Stable, content-scoped key: never restore progress onto an edited script. */
+export function practiceSessionStorageKey(cards: PracticeCard[], role: string): string {
+  const identity = cards.map((card) => `${card.key}:${card.answer}`).join('|');
+  let hash = 5381;
+  for (const character of `${role}|${identity}`) hash = ((hash * 33) ^ character.charCodeAt(0)) >>> 0;
+  return `puppy-journey:rehearsal-practice:v1:${hash.toString(36)}`;
+}
+
+export function restorePracticeSession(cards: PracticeCard[], raw: string | null): PracticeSession {
+  if (!raw) return createPracticeSession(cards);
+  try {
+    const saved = JSON.parse(raw) as Partial<PracticeSession>;
+    const index = saved.index;
+    const round = saved.round;
+    if (!Array.isArray(saved.cards) || saved.cards.length !== cards.length ||
+      saved.cards.some((card, index) => card?.key !== cards[index]?.key || card?.answer !== cards[index]?.answer) ||
+      !Number.isInteger(index) || index === undefined || index < 0 || index >= Math.max(cards.length, 1) ||
+      !Number.isInteger(round) || round === undefined || round < 1 || !Array.isArray(saved.review)) return createPracticeSession(cards);
+    const known = new Map(cards.map((card) => [card.key, card]));
+    const review = saved.review.map((card) => known.get(card?.key)).filter((card): card is PracticeCard => Boolean(card));
+    if (review.length !== saved.review.length || typeof saved.revealed !== 'boolean' || typeof saved.completed !== 'boolean') return createPracticeSession(cards);
+    return { cards, index, revealed: saved.revealed, review, completed: saved.completed, round };
+  } catch {
+    return createPracticeSession(cards);
+  }
+}
+
 export type PracticeAction = { type: 'reveal' } | { type: 'grade'; remembered: boolean } | { type: 'review' };
 export function practiceReducer(state: PracticeSession, action: PracticeAction): PracticeSession {
   if (action.type === 'review') {

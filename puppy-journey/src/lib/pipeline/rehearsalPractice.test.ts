@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createPracticeSession, practiceCards, practiceReducer, practiceRoles } from './rehearsalPractice';
+import { createPracticeSession, practiceCards, practiceReducer, practiceRoles, practiceSessionStorageKey, restorePracticeSession } from './rehearsalPractice';
 import type { LessonScript } from './types';
 
 const script = {
@@ -49,5 +49,14 @@ describe('saved script role practice', () => {
     expect(practiceReducer(empty, { type: 'reveal' })).toBe(empty);
     const state = createPracticeSession(practiceCards(script, 'Guest'));
     expect(practiceReducer(state, { type: 'review' })).toBe(state);
+  });
+
+  it('restores only an exact script session and drops malformed or stale saved progress', () => {
+    const cards = practiceCards(script, 'Guest');
+    const state = practiceReducer(practiceReducer(createPracticeSession(cards), { type: 'reveal' }), { type: 'grade', remembered: false });
+    expect(restorePracticeSession(cards, JSON.stringify(state))).toMatchObject({ index: 1, review: [cards[0]] });
+    expect(restorePracticeSession(cards, '{bad json')).toEqual(createPracticeSession(cards));
+    expect(restorePracticeSession([{ ...cards[0], answer: 'edited' }, ...cards.slice(1)], JSON.stringify(state))).toEqual(createPracticeSession([{ ...cards[0], answer: 'edited' }, ...cards.slice(1)]));
+    expect(practiceSessionStorageKey(cards, 'Guest')).not.toBe(practiceSessionStorageKey(cards, 'Waiter'));
   });
 });
