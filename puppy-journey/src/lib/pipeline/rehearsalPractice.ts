@@ -16,6 +16,7 @@ export type PracticeSession = {
   completed: boolean;
   round: number;
 };
+const PRACTICE_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Use line positions as keys: provider line IDs may be missing or duplicated. */
 export function practiceCards(script: LessonScript, character: string): PracticeCard[] {
@@ -45,10 +46,14 @@ export function practiceSessionStorageKey(cards: PracticeCard[], role: string): 
   return `puppy-journey:rehearsal-practice:v1:${hash.toString(36)}`;
 }
 
-export function restorePracticeSession(cards: PracticeCard[], raw: string | null): PracticeSession {
+export function restorePracticeSession(cards: PracticeCard[], raw: string | null, now = Date.now()): PracticeSession {
   if (!raw) return createPracticeSession(cards);
   try {
-    const saved = JSON.parse(raw) as Partial<PracticeSession>;
+    const parsed = JSON.parse(raw) as Partial<PracticeSession> | { version?: number; savedAt?: number; state?: Partial<PracticeSession> };
+    const envelope = 'state' in parsed ? parsed : null;
+    if (envelope && (envelope.version !== 1 || typeof envelope.savedAt !== 'number' ||
+      !Number.isFinite(envelope.savedAt) || envelope.savedAt > now + 60_000 || now - envelope.savedAt > PRACTICE_SESSION_MAX_AGE_MS)) return createPracticeSession(cards);
+    const saved = (envelope?.state ?? parsed) as Partial<PracticeSession>;
     const index = saved.index;
     const round = saved.round;
     if (!Array.isArray(saved.cards) || saved.cards.length !== cards.length ||
@@ -70,7 +75,7 @@ export function loadPersistedPracticeSession(cards: PracticeCard[], key: string)
 }
 
 export function persistPracticeSession(state: PracticeSession, key: string): void {
-  try { window.localStorage.setItem(key, JSON.stringify(state)); } catch { /* storage may be disabled or full */ }
+  try { window.localStorage.setItem(key, JSON.stringify({ version: 1, savedAt: Date.now(), state })); } catch { /* storage may be disabled or full */ }
 }
 
 export function clearPersistedPracticeSession(key: string): void {

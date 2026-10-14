@@ -64,4 +64,14 @@ describe('saved script role practice', () => {
     const cards = practiceCards(script, 'Guest');
     expect(loadPersistedPracticeSession(cards, 'blocked')).toEqual(createPracticeSession(cards));
   });
+
+  it('expires old persisted progress while accepting the legacy session format', () => {
+    const cards = practiceCards(script, 'Guest');
+    const state = practiceReducer(createPracticeSession(cards), { type: 'reveal' });
+    expect(restorePracticeSession(cards, JSON.stringify(state), 1_000).revealed).toBe(true);
+    const expired = JSON.stringify({ version: 1, savedAt: 1_000, state });
+    expect(restorePracticeSession(cards, expired, 1_000 + 31 * 24 * 60 * 60 * 1000)).toEqual(createPracticeSession(cards));
+    const current = JSON.stringify({ version: 1, savedAt: 1_000, state });
+    expect(restorePracticeSession(cards, current, 2_000).revealed).toBe(true);
+  });
 });
