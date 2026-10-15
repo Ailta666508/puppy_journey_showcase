@@ -46,6 +46,19 @@ export function createRehearsalRunState(input: NewRunInput): RehearsalRunState {
   };
 }
 
+export function rehearsalProgress(run: RehearsalRunState): {
+  completed: number;
+  total: number;
+  percent: number;
+  activeStage: RehearsalStage | null;
+  failedStage: RehearsalStage | null;
+} {
+  const completed = REHEARSAL_STAGES.filter((stage) => run.stages[stage].status === "completed").length;
+  const activeStage = REHEARSAL_STAGES.find((stage) => ["ready", "running"].includes(run.stages[stage].status)) ?? null;
+  const failedStage = REHEARSAL_STAGES.find((stage) => run.stages[stage].status === "failed") ?? null;
+  return { completed, total: REHEARSAL_STAGES.length, percent: Math.round((completed / REHEARSAL_STAGES.length) * 100), activeStage, failedStage };
+}
+
 export function startRehearsalStage(
   run: RehearsalRunState,
   stage: RehearsalStage,
