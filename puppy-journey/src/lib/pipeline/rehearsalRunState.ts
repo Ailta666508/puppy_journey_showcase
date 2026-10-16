@@ -52,11 +52,13 @@ export function rehearsalProgress(run: RehearsalRunState): {
   percent: number;
   activeStage: RehearsalStage | null;
   failedStage: RehearsalStage | null;
+  retryable: boolean;
+  activeAttempt: number | null;
 } {
   const completed = REHEARSAL_STAGES.filter((stage) => run.stages[stage].status === "completed").length;
   const activeStage = REHEARSAL_STAGES.find((stage) => ["ready", "running"].includes(run.stages[stage].status)) ?? null;
   const failedStage = REHEARSAL_STAGES.find((stage) => run.stages[stage].status === "failed") ?? null;
-  return { completed, total: REHEARSAL_STAGES.length, percent: Math.round((completed / REHEARSAL_STAGES.length) * 100), activeStage, failedStage };
+  return { completed, total: REHEARSAL_STAGES.length, percent: Math.round((completed / REHEARSAL_STAGES.length) * 100), activeStage, failedStage, retryable: failedStage !== null, activeAttempt: activeStage ? run.stages[activeStage].attempt : null };
 }
 
 export function startRehearsalStage(

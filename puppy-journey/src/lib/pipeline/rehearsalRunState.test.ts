@@ -87,8 +87,8 @@ describe("rehearsal run state", () => {
   it("projects observable progress without exposing mutable stage state", () => {
     let run = createRehearsalRunState({ id: "run", coupleId: "couple", authorId: "author", now: "2026-09-02T09:00:00.000Z" });
     run = startRehearsalStage(run, "context", "2026-09-02T09:01:00.000Z");
-    expect(rehearsalProgress(run)).toEqual({ completed: 0, total: 5, percent: 0, activeStage: "context", failedStage: null });
+    expect(rehearsalProgress(run)).toEqual({ completed: 0, total: 5, percent: 0, activeStage: "context", failedStage: null, retryable: false, activeAttempt: 1 });
     run = failRehearsalStage(run, "context", "timeout", "2026-09-02T09:02:00.000Z");
-    expect(rehearsalProgress(run)).toMatchObject({ failedStage: "context", activeStage: null });
+    expect(rehearsalProgress(run)).toMatchObject({ failedStage: "context", activeStage: null, retryable: true, activeAttempt: null });
   });
 });
