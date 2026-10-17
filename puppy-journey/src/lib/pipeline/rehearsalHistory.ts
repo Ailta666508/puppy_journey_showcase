@@ -29,6 +29,8 @@ export type RehearsalProgressSummary = {
   percent: number;
   label: string;
   activeStage: RehearsalStage | null;
+  activeAttempt: number | null;
+  retryable: boolean;
 };
 
 export type RehearsalFailureSummary = {
@@ -266,6 +268,8 @@ export function summarizeRehearsalProgress(
       percent: completed === totalStages ? 100 : 0,
       label: run.status === "completed" ? "全部完成" : run.status === "failed" ? "运行失败" : "等待开始",
       activeStage: null,
+      activeAttempt: null,
+      retryable: false,
     };
   }
 
@@ -292,6 +296,8 @@ export function summarizeRehearsalProgress(
     percent: Math.round((completedStages / totalStages) * 100),
     label,
     activeStage,
+    activeAttempt: activeStage ? stages[activeStage]?.attempt ?? 0 : null,
+    retryable: activeStatus === "failed" && retryableFailedStage(run) !== null,
   };
 }
 

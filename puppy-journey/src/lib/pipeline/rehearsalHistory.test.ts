@@ -186,6 +186,8 @@ describe("parseRehearsalHistoryResponse", () => {
       percent: 40,
       label: "生成关键帧失败",
       activeStage: "image",
+      activeAttempt: 2,
+      retryable: true,
     });
     expect(summarizeRehearsalFailure(run)).toEqual({
       stage: "image",

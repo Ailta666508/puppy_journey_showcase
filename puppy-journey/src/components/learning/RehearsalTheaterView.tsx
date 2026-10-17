@@ -1002,6 +1002,8 @@ export function RehearsalTheaterView() {
                             <p className="truncate text-[11px] text-white/80">{run.userText || "未命名排练"}</p>
                             <p className="text-[10px] text-white/40">
                               {progress.label}
+                              {progress.activeAttempt && progress.activeAttempt > 1 ? ` · 第 ${progress.activeAttempt} 次尝试` : ""}
+                              {progress.retryable ? " · 可重试" : ""}
                               {run.updatedAt ? ` · ${new Date(run.updatedAt).toLocaleDateString("zh-CN")}` : ""}
                             </p>
                             <div
