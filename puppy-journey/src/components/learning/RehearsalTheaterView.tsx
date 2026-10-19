@@ -1014,6 +1014,7 @@ export function RehearsalTheaterView() {
                               aria-valuemax={progress.totalStages}
                               aria-valuenow={progress.completedStages}
                               aria-valuetext={`${progress.label}，${progress.percent}%`}
+                              tabIndex={0}
                             >
                               <div
                                 className={`h-full rounded-full ${run.status === "failed" ? "bg-red-400/80" : "bg-amber-300/80"}`}
