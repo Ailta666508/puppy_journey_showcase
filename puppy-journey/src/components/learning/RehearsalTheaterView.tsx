@@ -1008,13 +1008,20 @@ export function RehearsalTheaterView() {
                             </p>
                             <div
                               className="h-1 overflow-hidden rounded-full bg-white/10"
-                              aria-label={`${progress.completedStages}/${progress.totalStages} stages completed`}
+                              aria-label={`${progress.label}，${progress.completedStages}/${progress.totalStages} 个阶段已完成；按 Enter 查看详情`}
                               role="progressbar"
                               aria-valuemin={0}
                               aria-valuemax={progress.totalStages}
                               aria-valuenow={progress.completedStages}
                               aria-valuetext={`${progress.label}，${progress.percent}%`}
+                              aria-keyshortcuts="Enter Space"
                               tabIndex={0}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  setHistoryDetailRun(run);
+                                }
+                              }}
                             >
                               <div
                                 className={`h-full rounded-full ${run.status === "failed" ? "bg-red-400/80" : "bg-amber-300/80"}`}
