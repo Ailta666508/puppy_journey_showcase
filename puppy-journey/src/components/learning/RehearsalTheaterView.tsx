@@ -184,6 +184,7 @@ export function RehearsalTheaterView() {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRetryId, setHistoryRetryId] = useState<string | null>(null);
+  const [historyCopiedId, setHistoryCopiedId] = useState<string | null>(null);
   const [historyDetailRun, setHistoryDetailRun] = useState<RehearsalHistoryRun | null>(null);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoadingOlder, setHistoryLoadingOlder] = useState(false);
@@ -193,6 +194,21 @@ export function RehearsalTheaterView() {
   const historyView = selectRehearsalHistory(rehearsalHistory, {
     query: historyQuery, status: historyFilter, page: historyPage,
   });
+
+  const copyHistorySummary = useCallback(async (run: RehearsalHistoryRun) => {
+    if (!navigator.clipboard) return;
+    const progress = summarizeRehearsalProgress(run);
+    const failure = summarizeRehearsalFailure(run);
+    const lines = [
+      `排练：${run.userText || "未命名排练"}`,
+      `状态：${progress.label}（${progress.completedStages}/${progress.totalStages}，${progress.percent}%）`,
+      run.updatedAt ? `更新时间：${new Date(run.updatedAt).toLocaleString("zh-CN")}` : null,
+      failure ? `失败：${failure.label} · ${failure.message}` : null,
+    ].filter((line): line is string => Boolean(line));
+    await navigator.clipboard.writeText(lines.join("\n"));
+    setHistoryCopiedId(run.id);
+    window.setTimeout(() => setHistoryCopiedId((current) => current === run.id ? null : current), 1600);
+  }, []);
 
   const [playing, setPlaying] = useState(false);
   const [playProgress, setPlayProgress] = useState(0);
@@ -1046,6 +1062,11 @@ export function RehearsalTheaterView() {
                             className="h-7 px-2 text-[10px]"
                             onClick={() => setHistoryDetailRun(run)}>
                             阶段详情
+                          </Button>
+                          <Button type="button" size="sm" variant="ghost"
+                            className="h-7 px-2 text-[10px]"
+                            onClick={() => void copyHistorySummary(run)}>
+                            {historyCopiedId === run.id ? "已复制" : "复制摘要"}
                           </Button>
                           {run.script ? (
                             <Button type="button" size="sm" variant="outline"
