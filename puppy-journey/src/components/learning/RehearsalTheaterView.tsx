@@ -63,6 +63,28 @@ const DEMO_PLAY_MS = 12_000;
 
 const DEFAULT_USER_TEXT = "白狗想去海边，白狗想吃鱼，黄狗想喝饮料。";
 
+async function copyTextWithFallback(text: string): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall through to the legacy path for browsers that deny clipboard permission.
+    }
+  }
+  if (typeof document === "undefined") return false;
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  return copied;
+}
+
 function buildDiaryPromptFromLog(log: TravelLog): string {
   const parts: string[] = [];
   if (log.title?.trim()) parts.push(`标题：${log.title.trim()}`);
@@ -196,7 +218,6 @@ export function RehearsalTheaterView() {
   });
 
   const copyHistorySummary = useCallback(async (run: RehearsalHistoryRun) => {
-    if (!navigator.clipboard) return;
     const progress = summarizeRehearsalProgress(run);
     const failure = summarizeRehearsalFailure(run);
     const lines = [
@@ -205,7 +226,7 @@ export function RehearsalTheaterView() {
       run.updatedAt ? `更新时间：${new Date(run.updatedAt).toLocaleString("zh-CN")}` : null,
       failure ? `失败：${failure.label} · ${failure.message}` : null,
     ].filter((line): line is string => Boolean(line));
-    await navigator.clipboard.writeText(lines.join("\n"));
+    if (!await copyTextWithFallback(lines.join("\n"))) return;
     setHistoryCopiedId(run.id);
     window.setTimeout(() => setHistoryCopiedId((current) => current === run.id ? null : current), 1600);
   }, []);
