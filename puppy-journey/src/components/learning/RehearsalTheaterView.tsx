@@ -259,8 +259,7 @@ export function RehearsalTheaterView() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const copyTranscript = async () => {
-    if (!transcriptScript || !navigator.clipboard) return;
-    await navigator.clipboard.writeText(rehearsalTranscript(transcriptScript));
+    if (!transcriptScript || !await copyTextWithFallback(rehearsalTranscript(transcriptScript))) return;
     setTranscriptCopied(true);
     window.setTimeout(() => setTranscriptCopied(false), 1600);
   };
@@ -938,7 +937,7 @@ export function RehearsalTheaterView() {
                       <Button type="button" variant="outline" aria-pressed={showTranslation} onClick={() => setShowTranslation(!showTranslation)}>
                         {showTranslation ? "隐藏翻译" : "显示翻译"}
                       </Button>
-                      <Button type="button" variant="outline" onClick={() => void copyTranscript()} disabled={typeof navigator === "undefined" || !navigator.clipboard}>
+                      <Button type="button" variant="outline" onClick={() => void copyTranscript()}>
                         {transcriptCopied ? "已复制" : "复制双语文本"}
                       </Button>
                       <Button type="button" onClick={downloadTranscript}>下载双语文本</Button>
