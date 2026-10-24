@@ -207,6 +207,7 @@ export function RehearsalTheaterView() {
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyRetryId, setHistoryRetryId] = useState<string | null>(null);
   const [historyCopiedId, setHistoryCopiedId] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [historyDetailRun, setHistoryDetailRun] = useState<RehearsalHistoryRun | null>(null);
   const [historyCursor, setHistoryCursor] = useState<string | null>(null);
   const [historyLoadingOlder, setHistoryLoadingOlder] = useState(false);
@@ -226,7 +227,11 @@ export function RehearsalTheaterView() {
       run.updatedAt ? `更新时间：${new Date(run.updatedAt).toLocaleString("zh-CN")}` : null,
       failure ? `失败：${failure.label} · ${failure.message}` : null,
     ].filter((line): line is string => Boolean(line));
-    if (!await copyTextWithFallback(lines.join("\n"))) return;
+    if (!await copyTextWithFallback(lines.join("\n"))) {
+      setCopyError("复制失败，请检查浏览器剪贴板权限后重试。");
+      return;
+    }
+    setCopyError(null);
     setHistoryCopiedId(run.id);
     window.setTimeout(() => setHistoryCopiedId((current) => current === run.id ? null : current), 1600);
   }, []);
@@ -259,7 +264,12 @@ export function RehearsalTheaterView() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const copyTranscript = async () => {
-    if (!transcriptScript || !await copyTextWithFallback(rehearsalTranscript(transcriptScript))) return;
+    if (!transcriptScript) return;
+    if (!await copyTextWithFallback(rehearsalTranscript(transcriptScript))) {
+      setCopyError("复制失败，你仍可下载双语文本。");
+      return;
+    }
+    setCopyError(null);
     setTranscriptCopied(true);
     window.setTimeout(() => setTranscriptCopied(false), 1600);
   };
@@ -942,6 +952,7 @@ export function RehearsalTheaterView() {
                       </Button>
                       <Button type="button" onClick={downloadTranscript}>下载双语文本</Button>
                     </div>
+                    {copyError ? <p role="status" aria-live="polite" className="text-sm text-amber-700">{copyError}</p> : null}
                     <ol className="space-y-4">
                       {transcriptScript ? transcriptLines(transcriptScript).map((line, index) => (
                         <li key={index} className="rounded border p-3">
@@ -1025,6 +1036,7 @@ export function RehearsalTheaterView() {
                     </select>
                   </div>
                   {historyError ? <p className="text-[10px] text-amber-200/80">{historyError}</p> : null}
+                  {copyError ? <p role="status" aria-live="polite" className="text-[10px] text-amber-200/80">{copyError}</p> : null}
                   {!historyLoading && !historyError && historyView.total === 0 ? (
                     <p className="text-[10px] text-white/45">没有匹配的排练；可清空搜索或切换状态。</p>
                   ) : null}
