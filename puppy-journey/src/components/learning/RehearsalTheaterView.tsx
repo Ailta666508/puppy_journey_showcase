@@ -1032,6 +1032,7 @@ export function RehearsalTheaterView() {
                       <option value="all">全部</option>
                       <option value="active">进行中</option>
                       <option value="failed">失败</option>
+                      <option value="retryable">可恢复失败</option>
                       <option value="completed">已完成</option>
                     </select>
                   </div>

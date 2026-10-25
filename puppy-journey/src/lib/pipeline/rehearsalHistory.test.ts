@@ -197,6 +197,20 @@ describe("parseRehearsalHistoryResponse", () => {
     });
   });
 
+  it("filters history to only failed media stages that can be safely retried", () => {
+    const retryable = {
+      id: "retryable", status: "failed", userText: "补拍", script: SCRIPT,
+      runState: { stages: { script: { status: "completed", attempt: 1 }, image: { status: "failed", attempt: 1 } } },
+    } as unknown as RehearsalHistoryRun;
+    const terminal = {
+      id: "terminal", status: "failed", userText: "脚本失败", script: SCRIPT,
+      runState: { stages: { script: { status: "failed", attempt: 1 } } },
+    } as unknown as RehearsalHistoryRun;
+    const selected = selectRehearsalHistory([retryable, terminal], { status: "retryable" });
+    expect(selected.total).toBe(1);
+    expect(selected.runs.map((run) => run.id)).toEqual(["retryable"]);
+  });
+
   it("falls back to the persisted job error for legacy failed runs", () => {
     const run = parseRehearsalHistoryResponse({
       runs: [{

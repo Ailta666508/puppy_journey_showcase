@@ -345,7 +345,7 @@ export function rehearsalStageTimeline(run: RehearsalHistoryRun): RehearsalStage
 }
 
 
-export type RehearsalHistoryFilter = "all" | "active" | "failed" | "completed";
+export type RehearsalHistoryFilter = "all" | "active" | "failed" | "completed" | "retryable";
 
 /** Browse the authorized response only; filtering never affects background polling. */
 export function selectRehearsalHistory(
@@ -353,7 +353,7 @@ export function selectRehearsalHistory(
   options: { query?: string; status?: RehearsalHistoryFilter; page?: number; pageSize?: number } = {},
 ): { runs: RehearsalHistoryRun[]; total: number; page: number; pageCount: number } {
   const { query = "", status = "all", page = 1, pageSize = 4 } = options;
-  if (!["all", "active", "failed", "completed"].includes(status)) throw new Error("无效的历史状态筛选");
+  if (!["all", "active", "failed", "completed", "retryable"].includes(status)) throw new Error("无效的历史状态筛选");
   if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1) {
     throw new Error("历史分页参数必须是正整数");
   }
@@ -362,7 +362,9 @@ export function selectRehearsalHistory(
   const matches = runs.filter((run) => {
     const statusMatches = status === "all" || (status === "active"
       ? run.status === "queued" || run.status === "processing"
-      : run.status === status);
+      : status === "retryable"
+        ? retryableFailedStage(run) !== null
+        : run.status === status);
     const textMatches = !needle || [run.userText, run.script?.scene ?? "", run.script?.theme ?? ""]
       .some((text) => normalize(text).includes(needle));
     return statusMatches && textMatches;
