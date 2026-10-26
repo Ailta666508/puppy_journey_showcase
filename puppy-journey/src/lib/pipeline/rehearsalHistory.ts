@@ -365,7 +365,11 @@ export function selectRehearsalHistory(
       : status === "retryable"
         ? retryableFailedStage(run) !== null
         : run.status === status);
-    const textMatches = !needle || [run.userText, run.script?.scene ?? "", run.script?.theme ?? ""]
+    const failedStage = run.status === "failed" ? summarizeRehearsalFailure(run) : null;
+    const textMatches = !needle || [
+      run.userText, run.script?.scene ?? "", run.script?.theme ?? "",
+      run.error ?? "", failedStage?.label ?? "", failedStage?.message ?? "",
+    ]
       .some((text) => normalize(text).includes(needle));
     return statusMatches && textMatches;
   });

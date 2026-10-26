@@ -395,6 +395,15 @@ describe("history search, status filters and pagination", () => {
     expect(selectRehearsalHistory(runs, { status: "completed" }).total).toBe(3);
   });
 
+  it("matches persisted failure details so recovery searches are actionable", () => {
+    const failed = parseRehearsalHistoryResponse({ runs: [{
+      id: "failed-media", status: "failed", userText: "旅行", error: "provider timeout",
+      runState: { stages: { script: { status: "completed", attempt: 1 }, image: { status: "failed", attempt: 2, error: "provider timeout" } } },
+    }] });
+    expect(selectRehearsalHistory(failed, { query: "timeout", status: "failed" }).total).toBe(1);
+    expect(selectRehearsalHistory(failed, { query: "关键帧" }).runs[0]?.id).toBe("failed-media");
+  });
+
   it("clamps the page when filters or refreshed results shrink the list", () => {
     expect(selectRehearsalHistory(runs, { page: 3, status: "failed" }).page).toBe(1);
     expect(selectRehearsalHistory([], { page: 3 })).toEqual({ runs: [], total: 0, page: 1, pageCount: 1 });
