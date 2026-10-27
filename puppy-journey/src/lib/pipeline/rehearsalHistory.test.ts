@@ -388,6 +388,12 @@ describe("history search, status filters and pagination", () => {
     expect(selectRehearsalHistory(runs, { page: 99 }).page).toBe(3);
   });
 
+  it("deduplicates repeated cursor pages without dropping the first record", () => {
+    const first = runs.slice(0, 2);
+    const merged = appendUniqueRehearsalRuns(first, [runs[1], runs[2], runs[2]]);
+    expect(merged.map((run) => run.id)).toEqual(["run-0", "run-1", "run-2"]);
+  });
+
   it("matches normalized titles, scene and theme together with status", () => {
     expect(selectRehearsalHistory(runs, { query: " cafe " }).runs.map((run) => run.id)).toEqual(["run-0"]);
     expect(selectRehearsalHistory(runs, { query: "barcelona", status: "failed" }).total).toBe(3);

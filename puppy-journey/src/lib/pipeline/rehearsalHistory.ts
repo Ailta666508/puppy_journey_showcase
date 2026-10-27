@@ -118,8 +118,14 @@ export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryR
 export function appendUniqueRehearsalRuns(
   current: RehearsalHistoryRun[], older: RehearsalHistoryRun[],
 ): RehearsalHistoryRun[] {
-  const ids = new Set(current.map((run) => run.id));
-  return [...current, ...older.filter((run) => !ids.has(run.id))];
+  const ids = new Set<string>();
+  const result: RehearsalHistoryRun[] = [];
+  for (const run of [...current, ...older]) {
+    if (ids.has(run.id)) continue;
+    ids.add(run.id);
+    result.push(run);
+  }
+  return result;
 }
 
 export function nextRehearsalHistoryCursor(
