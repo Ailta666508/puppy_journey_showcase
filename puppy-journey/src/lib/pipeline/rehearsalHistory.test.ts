@@ -394,6 +394,11 @@ describe("history search, status filters and pagination", () => {
     expect(merged.map((run) => run.id)).toEqual(["run-0", "run-1", "run-2"]);
   });
 
+  it("rejects blank continuation cursors before they can cause redundant paging", () => {
+    expect(nextRehearsalHistoryCursor("cursor-1", "   ")).toBeNull();
+    expect(nextRehearsalHistoryCursor("cursor-1", " cursor-2 ")).toBe("cursor-2");
+  });
+
   it("matches normalized titles, scene and theme together with status", () => {
     expect(selectRehearsalHistory(runs, { query: " cafe " }).runs.map((run) => run.id)).toEqual(["run-0"]);
     expect(selectRehearsalHistory(runs, { query: "barcelona", status: "failed" }).total).toBe(3);
