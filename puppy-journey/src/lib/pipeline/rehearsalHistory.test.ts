@@ -397,6 +397,7 @@ describe("history search, status filters and pagination", () => {
   it("rejects blank continuation cursors before they can cause redundant paging", () => {
     expect(nextRehearsalHistoryCursor("cursor-1", "   ")).toBeNull();
     expect(nextRehearsalHistoryCursor("cursor-1", " cursor-2 ")).toBe("cursor-2");
+    expect(nextRehearsalHistoryCursor(" cursor-2 ", "cursor-2")).toBeNull();
   });
 
   it("matches normalized titles, scene and theme together with status", () => {

@@ -133,7 +133,8 @@ export function nextRehearsalHistoryCursor(
   next: string | null,
 ): string | null {
   const candidate = next?.trim() ?? "";
-  return candidate && candidate !== previous ? candidate : null;
+  const prior = previous?.trim() ?? "";
+  return candidate && candidate !== prior ? candidate : null;
 }
 
 export function hasActiveRehearsalRuns(runs: RehearsalHistoryRun[]): boolean {
