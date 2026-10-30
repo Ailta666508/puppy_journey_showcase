@@ -121,7 +121,7 @@ export function appendUniqueRehearsalRuns(
   const ids = new Set<string>();
   const result: RehearsalHistoryRun[] = [];
   for (const run of [...current, ...older]) {
-    if (ids.has(run.id)) continue;
+    if (!run.id || ids.has(run.id)) continue;
     ids.add(run.id);
     result.push(run);
   }

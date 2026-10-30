@@ -394,6 +394,11 @@ describe("history search, status filters and pagination", () => {
     expect(merged.map((run) => run.id)).toEqual(["run-0", "run-1", "run-2"]);
   });
 
+  it("ignores invalid empty ids when merging externally supplied pages", () => {
+    const merged = appendUniqueRehearsalRuns([], [{ ...runs[0], id: "" }, runs[1]]);
+    expect(merged.map((run) => run.id)).toEqual(["run-1"]);
+  });
+
   it("rejects blank continuation cursors before they can cause redundant paging", () => {
     expect(nextRehearsalHistoryCursor("cursor-1", "   ")).toBeNull();
     expect(nextRehearsalHistoryCursor("cursor-1", " cursor-2 ")).toBe("cursor-2");
