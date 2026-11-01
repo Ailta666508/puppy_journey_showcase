@@ -84,11 +84,12 @@ export function parseRehearsalHistoryPage(value: unknown): { runs: RehearsalHist
   const parsed = runs.flatMap((entry) => {
     if (!entry || typeof entry !== "object") return [];
     const row = entry as Record<string, unknown>;
-    if (typeof row.id !== "string" || !row.id || !STATUSES.has(row.status as PipelineJobStatus)) {
+    const id = typeof row.id === "string" ? row.id.trim() : "";
+    if (!id || !STATUSES.has(row.status as PipelineJobStatus)) {
       return [];
     }
     return [{
-      id: row.id,
+      id,
       status: row.status as PipelineJobStatus,
       userText: typeof row.userText === "string" ? row.userText : "",
       script: isLessonScript(row.script) ? row.script : null,
@@ -108,7 +109,7 @@ export function parseRehearsalHistoryPage(value: unknown): { runs: RehearsalHist
   if (nextCursor !== undefined && nextCursor !== null && typeof nextCursor !== "string") {
     throw new Error("排练历史接口返回无效游标");
   }
-  return { runs: parsed, nextCursor: nextCursor ?? null };
+  return { runs: appendUniqueRehearsalRuns([], parsed), nextCursor: nextCursor ?? null };
 }
 
 export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryRun[] {

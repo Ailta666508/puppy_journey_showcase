@@ -102,7 +102,9 @@ describe("parseRehearsalHistoryResponse", () => {
       runs: [
         null,
         { id: "", status: "completed" },
+        { id: "   ", status: "completed" },
         { id: "run-2", status: "unknown" },
+        { id: " run-3 ", status: "failed", error: "duplicate should collapse" },
         { id: "run-3", status: "failed", error: "provider timeout", updatedAt: "" },
       ],
     });
@@ -110,7 +112,7 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(runs).toEqual([expect.objectContaining({
       id: "run-3",
       status: "failed",
-      error: "provider timeout",
+      error: "duplicate should collapse",
     })]);
   });
 
