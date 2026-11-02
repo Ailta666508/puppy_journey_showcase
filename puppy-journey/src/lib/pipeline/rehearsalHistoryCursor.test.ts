@@ -32,4 +32,12 @@ describe("rehearsal history cursor", () => {
     expect(decodeRehearsalHistoryCursor(page.nextCursor)).toEqual({ createdAt: rows[1].created_at, id: rows[1].id });
     expect(pageRehearsalHistoryRows(rows.slice(0, 2), 2).nextCursor).toBeNull();
   });
+
+  it("does not emit a cursor from malformed persisted row metadata", () => {
+    const rows = [
+      { id: "not-a-uuid", created_at: "2026-10-07T00:00:00.000Z" },
+      { id: ID, created_at: "2026-10-06T00:00:00.000Z" },
+    ];
+    expect(pageRehearsalHistoryRows(rows, 1).nextCursor).toBeNull();
+  });
 });

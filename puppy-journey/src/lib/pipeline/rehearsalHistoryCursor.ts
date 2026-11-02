@@ -38,10 +38,13 @@ export function pageRehearsalHistoryRows<T extends { id: string; created_at: str
 ): { rows: T[]; nextCursor: string | null } {
   const page = rows.slice(0, limit);
   const last = page.at(-1);
+  const lastTime = last ? Date.parse(last.created_at) : Number.NaN;
+  const canEncodeCursor = last !== undefined && UUID.test(last.id) && Number.isFinite(lastTime)
+    && new Date(lastTime).toISOString() === last.created_at;
   return {
     rows: page,
-    nextCursor: rows.length > limit && last
-      ? encodeRehearsalHistoryCursor({ createdAt: new Date(last.created_at).toISOString(), id: last.id })
+    nextCursor: rows.length > limit && canEncodeCursor
+      ? encodeRehearsalHistoryCursor({ createdAt: new Date(last!.created_at).toISOString(), id: last!.id })
       : null,
   };
 }
