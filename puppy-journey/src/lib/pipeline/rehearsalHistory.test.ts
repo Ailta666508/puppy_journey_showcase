@@ -68,6 +68,7 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(() => parseRehearsalHistoryPage({ runs: [], nextCursor: 3 })).toThrow("无效游标");
     expect(nextRehearsalHistoryCursor("opaque-cursor", "opaque-cursor")).toBeNull();
     expect(nextRehearsalHistoryCursor("opaque-cursor", "next-cursor")).toBe("next-cursor");
+    expect(parseRehearsalHistoryPage({ runs: [], nextCursor: "   " }).nextCursor).toBeNull();
   });
   it("keeps playable fields from valid persisted runs", () => {
     const runs = parseRehearsalHistoryResponse({

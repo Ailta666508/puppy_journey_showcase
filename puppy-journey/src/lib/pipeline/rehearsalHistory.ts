@@ -109,7 +109,7 @@ export function parseRehearsalHistoryPage(value: unknown): { runs: RehearsalHist
   if (nextCursor !== undefined && nextCursor !== null && typeof nextCursor !== "string") {
     throw new Error("排练历史接口返回无效游标");
   }
-  return { runs: appendUniqueRehearsalRuns([], parsed), nextCursor: nextCursor ?? null };
+  return { runs: appendUniqueRehearsalRuns([], parsed), nextCursor: typeof nextCursor === "string" ? nextCursor.trim() || null : null };
 }
 
 export function parseRehearsalHistoryResponse(value: unknown): RehearsalHistoryRun[] {
