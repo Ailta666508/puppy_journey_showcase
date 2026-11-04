@@ -62,7 +62,9 @@ export const REHEARSAL_IMAGE_RECOVERY_AFTER_MS = 2 * 60 * 1000;
 export const REHEARSAL_VIDEO_RECOVERY_AFTER_MS = 2 * 60 * 1000;
 
 function optionalString(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value : null;
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  return normalized || null;
 }
 
 function isLessonScript(value: unknown): value is LessonScript {

@@ -98,6 +98,21 @@ describe("parseRehearsalHistoryResponse", () => {
     });
   });
 
+  it("trims optional persisted strings before exposing them to the UI", () => {
+    const [run] = parseRehearsalHistoryResponse({
+      runs: [{
+        id: "run-trim",
+        status: "completed",
+        keyImageUrl: "  https://example.com/frame.png  ",
+        providerTaskId: " provider-1 ",
+        error: "  provider timeout  ",
+      }],
+    });
+    expect(run.keyImageUrl).toBe("https://example.com/frame.png");
+    expect(run.providerTaskId).toBe("provider-1");
+    expect(run.error).toBe("provider timeout");
+  });
+
   it("drops malformed rows while preserving failed runs", () => {
     const runs = parseRehearsalHistoryResponse({
       runs: [
