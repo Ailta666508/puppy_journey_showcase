@@ -67,6 +67,13 @@ function optionalString(value: unknown): string | null {
   return normalized || null;
 }
 
+function persistedTimestamp(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  const parsed = Date.parse(trimmed);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+}
+
 function isLessonScript(value: unknown): value is LessonScript {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<LessonScript>;
@@ -103,8 +110,8 @@ export function parseRehearsalHistoryPage(value: unknown): { runs: RehearsalHist
       thumbnailUrl: optionalString(row.thumbnailUrl),
       providerTaskId: optionalString(row.providerTaskId),
       error: optionalString(row.error),
-      createdAt: typeof row.createdAt === "string" ? row.createdAt : "",
-      updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : "",
+      createdAt: persistedTimestamp(row.createdAt),
+      updatedAt: persistedTimestamp(row.updatedAt),
     }];
   });
   const nextCursor = (value as { nextCursor?: unknown }).nextCursor;

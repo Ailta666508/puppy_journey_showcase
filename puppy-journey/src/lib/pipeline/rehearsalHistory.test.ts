@@ -113,6 +113,19 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(run.error).toBe("provider timeout");
   });
 
+  it("canonicalizes valid timestamps and drops malformed persisted timestamps", () => {
+    const [run] = parseRehearsalHistoryResponse({
+      runs: [{
+        id: "run-time",
+        status: "processing",
+        createdAt: " 2026-11-05T08:00:00+08:00 ",
+        updatedAt: "not-a-timestamp",
+      }],
+    });
+    expect(run.createdAt).toBe("2026-11-05T00:00:00.000Z");
+    expect(run.updatedAt).toBe("");
+  });
+
   it("drops malformed rows while preserving failed runs", () => {
     const runs = parseRehearsalHistoryResponse({
       runs: [
