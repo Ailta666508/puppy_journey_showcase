@@ -67,6 +67,18 @@ function optionalString(value: unknown): string | null {
   return normalized || null;
 }
 
+function optionalMediaUrl(value: unknown): string | null {
+  const normalized = optionalString(value);
+  if (!normalized) return null;
+  if (normalized.startsWith("/")) return normalized;
+  try {
+    const parsed = new URL(normalized);
+    return ["http:", "https:", "blob:"].includes(parsed.protocol) ? normalized : null;
+  } catch {
+    return null;
+  }
+}
+
 function persistedTimestamp(value: unknown): string {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
@@ -105,9 +117,9 @@ export function parseRehearsalHistoryPage(value: unknown): { runs: RehearsalHist
       runState: row.runState && typeof row.runState === "object"
         ? row.runState as RehearsalRunState
         : null,
-      keyImageUrl: optionalString(row.keyImageUrl),
-      videoUrl: optionalString(row.videoUrl),
-      thumbnailUrl: optionalString(row.thumbnailUrl),
+      keyImageUrl: optionalMediaUrl(row.keyImageUrl),
+      videoUrl: optionalMediaUrl(row.videoUrl),
+      thumbnailUrl: optionalMediaUrl(row.thumbnailUrl),
       providerTaskId: optionalString(row.providerTaskId),
       error: optionalString(row.error),
       createdAt: persistedTimestamp(row.createdAt),

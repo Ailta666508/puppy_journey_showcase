@@ -113,6 +113,14 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(run.error).toBe("provider timeout");
   });
 
+  it("drops unsafe persisted media protocols", () => {
+    const [run] = parseRehearsalHistoryResponse({
+      runs: [{ id: "run-url", status: "completed", keyImageUrl: "javascript:alert(1)", videoUrl: " /local/video.mp4 " }],
+    });
+    expect(run.keyImageUrl).toBeNull();
+    expect(run.videoUrl).toBe("/local/video.mp4");
+  });
+
   it("canonicalizes valid timestamps and drops malformed persisted timestamps", () => {
     const [run] = parseRehearsalHistoryResponse({
       runs: [{
