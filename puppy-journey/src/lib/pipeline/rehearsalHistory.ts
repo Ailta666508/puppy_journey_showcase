@@ -8,6 +8,7 @@ import {
 
 export type RehearsalHistoryRun = {
   id: string;
+  authorId?: string | null;
   status: PipelineJobStatus;
   userText: string;
   script: LessonScript | null;
@@ -111,6 +112,7 @@ export function parseRehearsalHistoryPage(value: unknown): { runs: RehearsalHist
     }
     return [{
       id,
+      authorId: optionalString(row.authorId),
       status: row.status as PipelineJobStatus,
       userText: typeof row.userText === "string" ? row.userText : "",
       script: isLessonScript(row.script) ? row.script : null,

@@ -74,6 +74,7 @@ describe("parseRehearsalHistoryResponse", () => {
     const runs = parseRehearsalHistoryResponse({
       runs: [{
         id: "run-1",
+        authorId: " author-1 ",
         status: "completed",
         userText: "去看雪山",
         script: SCRIPT,
@@ -90,6 +91,7 @@ describe("parseRehearsalHistoryResponse", () => {
     expect(runs).toHaveLength(1);
     expect(runs[0]).toMatchObject({
       id: "run-1",
+      authorId: "author-1",
       status: "completed",
       userText: "去看雪山",
       videoUrl: "https://example.com/movie.mp4",
