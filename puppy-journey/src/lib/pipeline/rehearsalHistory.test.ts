@@ -415,6 +415,12 @@ describe("parseRehearsalHistoryResponse", () => {
 
 
 describe("history search, status filters and pagination", () => {
+  it("scopes history results to the requested author", () => {
+    const owned = { id: "owned", authorId: "author-1", status: "completed", userText: "我的排练", script: SCRIPT, error: null, updatedAt: "", createdAt: "", runState: null, keyImageUrl: null, videoUrl: null, thumbnailUrl: null, providerTaskId: null } as unknown as RehearsalHistoryRun;
+    const other = { ...owned, id: "other", authorId: "author-2" };
+    expect(selectRehearsalHistory([owned, other], { authorId: " author-1 " }).runs.map((run) => run.id)).toEqual(["owned"]);
+    expect(() => selectRehearsalHistory([owned], { authorId: "  " })).toThrow("历史作者筛选必须是非空字符串");
+  });
   const runs = parseRehearsalHistoryResponse({ runs: Array.from({ length: 9 }, (_, index) => ({
     id: `run-${index}`, status: ["completed", "failed", "processing"][index % 3],
     userText: index === 0 ? "ＣＡＦＥ" : `旅行 ${index}`,
